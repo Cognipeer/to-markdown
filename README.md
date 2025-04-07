@@ -19,12 +19,8 @@ This library supports converting the following file formats to Markdown:
 - CSV data
 - Jupyter notebooks (.ipynb)
 - PowerPoint presentations (.pptx)
-- ZIP archives
 - XML files and RSS/ATOM feeds
-- Images (jpg, png, gif)
-- Audio metadata (mp3, wav)
 - Plain text files
-- Web content (YouTube videos, Bing search results)
 
 ## Usage
 
