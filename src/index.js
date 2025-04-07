@@ -106,9 +106,21 @@ async function convertToMarkdown(input, options = {}) {
         }
       }
     }
+  } else if (Buffer.isBuffer(input)) {
+    fileBuffer = input;
+    ext = options.forceExtension ? options.forceExtension.toLowerCase() : null;
+
+    if (!ext || ext === "") {
+      const fType = await fromBuffer(fileBuffer);
+      if (fType) {
+        ext = "." + fType.ext;
+      } else {
+        ext = ".txt";
+      }
+    }
   } else {
     throw new Error(
-      "Invalid input format. Must be a string (file path or base64)"
+      "Invalid input format. Must be a string (file path or base64) or Buffer"
     );
   }
 
