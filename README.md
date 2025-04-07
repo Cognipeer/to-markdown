@@ -15,29 +15,40 @@ This library supports converting the following file formats to Markdown:
 - PDF documents
 - Word documents (.docx)
 - HTML content
-- Excel spreadsheets (.xlsx)
+- Excel spreadsheets (.xlsx, .xls)
 - CSV data
+- Jupyter notebooks (.ipynb)
+- PowerPoint presentations (.pptx)
 - ZIP archives
-- XML files
-- Images
-- Audio metadata
+- XML files and RSS/ATOM feeds
+- Images (jpg, png, gif)
+- Audio metadata (mp3, wav)
+- Plain text files
+- Web content (YouTube videos, Bing search results)
 
 ## Usage
 
 ```javascript
-import { convertToMarkdown } from "@cognipeer/to-markdown";
+import { convertToMarkdown, saveToMarkdownFile } from "@cognipeer/to-markdown";
+
+// Convert from file path
+const result = await convertToMarkdown("/path/to/document.docx");
+console.log(result);
 
 // Convert from buffer
 const buffer = fs.readFileSync("document.pdf");
 const result = await convertToMarkdown(buffer, {
-  filename: "document.pdf",
-  mimeType: "application/pdf",
+  fileName: "document.pdf",
 });
-console.log(result.markdown);
+console.log(result);
 
-// Convert from file path
-const result = await convertToMarkdown("/path/to/document.docx");
-console.log(result.markdown);
+// Convert from base64 string
+const base64Content = "data:application/pdf;base64,JVBERi0xLjUNCiW...";
+const result = await convertToMarkdown(base64Content);
+console.log(result);
+
+// Save converted markdown to a file
+await saveToMarkdownFile(result, "converted-document", "./output");
 ```
 
 ## API
@@ -48,28 +59,48 @@ Converts the input to Markdown.
 
 **Parameters:**
 
-- `input`: Buffer or string (file path)
+- `input`:
+  - String (file path)
+  - String (base64 data)
+  - Buffer (file content)
 - `options`: Object (optional)
-  - `filename`: String - Name of the file (required when input is a buffer)
-  - `mimeType`: String - MIME type of the file (optional, will be detected if not provided)
+  - `fileName`: String - Name of the file (helpful for buffer inputs)
+  - `forceExtension`: String - Force a specific file extension for processing
+  - `url`: String - Original URL (used for web content like YouTube or Bing search)
 
 **Returns:**
 
-- Promise that resolves to an object:
-  - `markdown`: String - The converted markdown content
-  - `metadata`: Object - Additional metadata extracted from the file (if available)
+- The converted markdown content as a string
+
+### saveToMarkdownFile(content, fileName, outputDir)
+
+Saves the markdown content to a file.
+
+**Parameters:**
+
+- `content`: String - The markdown content to save
+- `fileName`: String - Name for the output file
+- `outputDir`: String - Directory to save the file (defaults to "output")
+
+**Returns:**
+
+- Promise that resolves to the path of the saved file
 
 ## Supported File Types
 
 - **PDF**: Converts PDF documents to Markdown
 - **Word (.docx)**: Converts Microsoft Word documents to Markdown
-- **HTML**: Converts HTML content to Markdown
-- **Excel (.xlsx)**: Converts Excel spreadsheets to Markdown tables
+- **HTML/HTM**: Converts HTML content to Markdown
+- **Jupyter Notebooks (.ipynb)**: Converts notebooks to Markdown preserving code blocks
+- **Excel (.xlsx, .xls)**: Converts Excel spreadsheets to Markdown tables
 - **CSV**: Converts CSV data to Markdown tables
+- **PowerPoint (.pptx)**: Extracts text from presentation slides
 - **ZIP**: Extracts contents and converts applicable files to Markdown
-- **XML**: Converts XML to Markdown
-- **Images**: Embeds images or provides links in Markdown format
-- **Audio**: Extracts metadata from audio files in Markdown format
+- **XML/RSS/ATOM**: Converts XML and feed formats to Markdown
+- **Images (.jpg, .png, .gif)**: Extracts image metadata
+- **Audio (.mp3, .wav)**: Extracts audio metadata
+- **Text (.txt)**: Converts plain text files
+- **Web content**: Special handling for YouTube videos and Bing search results
 
 ## Examples
 
@@ -80,11 +111,11 @@ import { convertToMarkdown } from "@cognipeer/to-markdown";
 import fs from "fs";
 
 const pdfBuffer = fs.readFileSync("document.pdf");
-const result = await convertToMarkdown(pdfBuffer, {
-  filename: "document.pdf",
+const markdown = await convertToMarkdown(pdfBuffer, {
+  fileName: "document.pdf",
 });
 
-console.log(result.markdown);
+console.log(markdown);
 ```
 
 ### Convert DOCX to Markdown
@@ -92,8 +123,35 @@ console.log(result.markdown);
 ```javascript
 import { convertToMarkdown } from "@cognipeer/to-markdown";
 
-const result = await convertToMarkdown("/path/to/document.docx");
-console.log(result.markdown);
+const markdown = await convertToMarkdown("/path/to/document.docx");
+console.log(markdown);
+```
+
+### Convert HTML to Markdown
+
+```javascript
+import { convertToMarkdown, saveToMarkdownFile } from "@cognipeer/to-markdown";
+import fs from "fs";
+
+const htmlContent = fs.readFileSync("page.html", "utf-8");
+const markdown = await convertToMarkdown(htmlContent, {
+  forceExtension: ".html",
+});
+console.log(markdown);
+```
+
+### Convert and Save to File
+
+```javascript
+import { convertToMarkdown, saveToMarkdownFile } from "@cognipeer/to-markdown";
+
+const markdown = await convertToMarkdown("/path/to/document.pdf");
+const savedPath = await saveToMarkdownFile(
+  markdown,
+  "converted-document",
+  "./output"
+);
+console.log(`Saved to: ${savedPath}`);
 ```
 
 ## License
