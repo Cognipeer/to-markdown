@@ -1,5 +1,7 @@
 # @cognipeer/to-markdown
 
+[![npm](https://img.shields.io/npm/v/@cognipeer/to-markdown?color=success)](https://npmjs.com/package/@cognipeer/to-markdown)
+
 A versatile utility library for converting various file formats to Markdown.
 
 ## Installation
