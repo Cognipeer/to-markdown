@@ -197,7 +197,8 @@ async function convertDocxToMarkdown(buffer) {
     const result = await convertToHtml({ buffer }, { styleMap: [] });
     const html = result.value || "";
 
-    markdown = htmlToMarkdown(html);
+    let markdown = htmlToMarkdown(html);
+    markdown = formatMarkdown(markdown);
 
     return markdown;
   } catch (err) {
