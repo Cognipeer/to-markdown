@@ -1,8 +1,10 @@
 import AdmZip from 'adm-zip';
 import { writeFileSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { join, extname } from 'path';
 import { parseStringPromise } from 'xml2js';
 import { formatMarkdown } from '../utils/markdown.js';
+import { convertHtmlToMarkdown } from './html.js';
+import { convertCsvToMarkdown } from './spreadsheet.js';
 import type { ConverterOptions } from '../types/index.js';
 
 /**
@@ -77,19 +79,44 @@ export async function convertZipToMarkdown(
     const zip = new AdmZip(buffer);
     const entries = zip.getEntries();
 
-    let md = `Content from the zip file:\n\n`;
+    const TEXT_EXTS = new Set(['.txt', '.md', '.csv', '.html', '.htm', '.xml', '.json', '.yaml', '.yml', '.js', '.ts', '.py', '.sh', '.css', '.sql']);
 
-    // Note: This would create circular dependency if we import convertToMarkdown
-    // In the main index.ts, we'll handle this differently
+    let md = `# ZIP Archive Contents\n\n`;
+
     for (const entry of entries) {
-      if (!entry.isDirectory) {
-        const fileName = entry.entryName;
-        md += `## File: ${fileName}\n\n`;
-        md += `(Binary content - ${entry.getData().length} bytes)\n\n`;
+      if (entry.isDirectory) continue;
+
+      const fileName = entry.entryName;
+      const ext = extname(fileName).toLowerCase();
+      md += `## File: ${fileName}\n\n`;
+
+      if (TEXT_EXTS.has(ext)) {
+        try {
+          const content = entry.getData().toString('utf-8');
+          if (ext === '.md') {
+            md += content + '\n\n';
+          } else if (ext === '.csv') {
+            md += convertCsvToMarkdown(entry.getData()) + '\n\n';
+          } else if (ext === '.html' || ext === '.htm') {
+            md += convertHtmlToMarkdown(entry.getData()) + '\n\n';
+          } else if (ext === '.json') {
+            md += '```json\n' + content.trim() + '\n```\n\n';
+          } else if (ext === '.yaml' || ext === '.yml') {
+            md += '```yaml\n' + content.trim() + '\n```\n\n';
+          } else if (['.js', '.ts', '.py', '.sh', '.css', '.sql'].includes(ext)) {
+            md += '```' + ext.slice(1) + '\n' + content.trim() + '\n```\n\n';
+          } else {
+            md += content + '\n\n';
+          }
+        } catch {
+          md += `(Could not read content - ${entry.getData().length} bytes)\n\n`;
+        }
+      } else {
+        md += `(Binary file - ${entry.getData().length} bytes)\n\n`;
       }
     }
 
-    return formatMarkdown(md);
+    return md.trim();
   } catch (err: any) {
     throw new Error(`Failed to convert ZIP: ${err.message}`);
   }

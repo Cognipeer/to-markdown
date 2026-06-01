@@ -12,13 +12,9 @@ export function formatMarkdown(text: string): string {
 
     if (!line) continue;
 
-    // Convert bold text to heading
-    if (line.startsWith('**') && line.endsWith('**')) {
+    // Convert bold-only lines to heading (e.g. **Title** → ## Title)
+    if (line.startsWith('**') && line.endsWith('**') && line.length > 4) {
       line = '## ' + line.replace(/^\*\*|\*\*$/g, '');
-    }
-    // Convert potential titles to headings
-    else if (/^[A-Z0-9][^.!?]{2,}[.!?]?$/.test(line) && line.length < 100) {
-      line = '## ' + line;
     }
 
     // Normalize list markers
