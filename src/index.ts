@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { isAbsolute, join } from 'path';
-import type { ConverterInput, ConverterOptions, FileExtension } from './types/index.js';
+import type { ConverterInput, ConverterOptions, FileExtension, BatchInput, BatchResult } from './types/index.js';
 import { detectFileType } from './utils/fileDetection.js';
 import { convertPdfToMarkdown } from './converters/pdf.js';
 import { convertDocxToMarkdown } from './converters/docx.js';
@@ -11,6 +11,8 @@ import { convertRssAtomToMarkdown } from './converters/xml.js';
 import { convertExcelToMarkdown, convertCsvToMarkdown } from './converters/spreadsheet.js';
 import { convertAudioToMarkdown, convertImageToMarkdown } from './converters/media.js';
 import { convertPptxToMarkdown, convertZipToMarkdown } from './converters/archive.js';
+import { convertJsonToMarkdown, convertYamlToMarkdown } from './converters/data.js';
+export { convertUrlToMarkdown } from './converters/url.js';
 
 /**
  * Main function to convert various file formats to Markdown
@@ -84,6 +86,13 @@ export async function convertToMarkdown(
     case '.gif':
       return await convertImageToMarkdown(buffer, ext);
 
+    case '.json':
+      return convertJsonToMarkdown(buffer);
+
+    case '.yaml':
+    case '.yml':
+      return convertYamlToMarkdown(buffer);
+
     default:
       // Handle special cases based on URL
       if (options.url && options.url.includes('youtube.com')) {
@@ -137,11 +146,40 @@ export async function saveToMarkdownFile(
   }
 }
 
+/**
+ * Converts multiple inputs to Markdown in parallel.
+ *
+ * @param items  - Array of {input, options?} objects
+ * @returns Array of BatchResult — one entry per input, with result or error
+ *
+ * @example
+ * ```typescript
+ * const results = await convertBatchToMarkdown([
+ *   { input: 'report.pdf' },
+ *   { input: Buffer.from('<h1>Hi</h1>'), options: { forceExtension: '.html' } },
+ * ]);
+ * ```
+ */
+export async function convertBatchToMarkdown(items: BatchInput[]): Promise<BatchResult[]> {
+  return Promise.all(
+    items.map(async ({ input, options = {} }) => {
+      const inputId = typeof input === 'string' ? input : 'buffer';
+      try {
+        const result = await convertToMarkdown(input, options);
+        return { inputId, result };
+      } catch (err: any) {
+        return { inputId, error: err.message };
+      }
+    })
+  );
+}
+
 // Export all types
 export * from './types/index.js';
 
 // Default export for backward compatibility
 export default {
   convertToMarkdown,
+  convertBatchToMarkdown,
   saveToMarkdownFile,
 };
