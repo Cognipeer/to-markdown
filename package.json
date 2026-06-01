@@ -30,7 +30,7 @@
     "clean": "rm -rf dist",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "docs:dev": "cd docs && bundle exec jekyll serve",
     "docs:build": "cd docs && bundle exec jekyll build",
     "publish-private": "npm publish",
@@ -60,7 +60,7 @@
   },
   "homepage": "https://cognipeer.github.io/to-markdown",
   "dependencies": {
-    "@opendocsg/pdf2md": "^0.2.1",
+    "unpdf": "^0.12.1",
     "@types/js-yaml": "^4.0.9",
     "adm-zip": "^0.5.16",
     "cheerio": "^1.0.0",
@@ -97,6 +97,6 @@
     "vitest": "^4.1.7"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   }
 }

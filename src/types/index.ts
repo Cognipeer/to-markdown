@@ -101,7 +101,7 @@ export interface BatchInput {
  * Result for a single batch conversion item
  */
 export interface BatchResult {
-  /** Input identifier — file path if string, 'buffer' for Buffer inputs */
+  /** Input identifier — file path if string, 'buffer:<index>' for Buffer inputs */  
   inputId: string;
   /** Converted Markdown content, present on success */
   result?: string;

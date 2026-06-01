@@ -30,6 +30,28 @@ export async function convertExcelToMarkdown(buffer: Buffer): Promise<string> {
 }
 
 /**
+ * Returns true if `buffer` contains only well-formed UTF-8 sequences.
+ * A single invalid byte or truncated sequence is enough to return false.
+ */
+function isValidUtf8(buffer: Buffer): boolean {
+  let i = 0;
+  while (i < buffer.length) {
+    const b = buffer[i];
+    let extra = 0;
+    if (b <= 0x7f) { i++; continue; }
+    else if ((b & 0xe0) === 0xc0) { extra = 1; }
+    else if ((b & 0xf0) === 0xe0) { extra = 2; }
+    else if ((b & 0xf8) === 0xf0) { extra = 3; }
+    else { return false; }
+    for (let j = 1; j <= extra; j++) {
+      if (i + j >= buffer.length || (buffer[i + j] & 0xc0) !== 0x80) return false;
+    }
+    i += 1 + extra;
+  }
+  return true;
+}
+
+/**
  * Detects encoding from a Buffer using BOM and heuristics,
  * then decodes it with iconv-lite.
  */
@@ -47,20 +69,22 @@ function decodeBuffer(buffer: Buffer): string {
     return iconv.decode(buffer.slice(2), 'utf-16be');
   }
 
-  // Heuristic: check for high bytes that suggest non-UTF-8 multibyte (Shift-JIS / CP932)
+  // Validate as UTF-8 first. UTF-8 multi-byte lead bytes (0xC0-0xFF) overlap with
+  // Shift-JIS lead bytes, so heuristics alone would corrupt valid UTF-8 content.
+  if (isValidUtf8(buffer)) {
+    return buffer.toString('utf-8');
+  }
+
+  // Buffer is not valid UTF-8 — check for Shift-JIS / CP932 signature bytes.
   // Shift-JIS lead bytes: 0x81-0x9F, 0xE0-0xFC
-  let shiftJisScore = 0;
   for (let i = 0; i < Math.min(buffer.length - 1, 1000); i++) {
     const b = buffer[i];
     if ((b >= 0x81 && b <= 0x9f) || (b >= 0xe0 && b <= 0xfc)) {
-      shiftJisScore++;
+      return iconv.decode(buffer, 'cp932');
     }
   }
-  if (shiftJisScore > 2) {
-    return iconv.decode(buffer, 'cp932');
-  }
 
-  // Default: UTF-8
+  // Fallback: treat as UTF-8 (replacement chars for invalid bytes)
   return buffer.toString('utf-8');
 }
 

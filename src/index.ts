@@ -170,8 +170,8 @@ export async function saveToMarkdownFile(
  */
 export async function convertBatchToMarkdown(items: BatchInput[]): Promise<BatchResult[]> {
   return Promise.all(
-    items.map(async ({ input, options = {} }) => {
-      const inputId = typeof input === 'string' ? input : 'buffer';
+    items.map(async ({ input, options = {} }, index) => {
+      const inputId = typeof input === 'string' ? input : `buffer:${index}`;
       try {
         const result = await convertToMarkdown(input, options);
         return { inputId, result };

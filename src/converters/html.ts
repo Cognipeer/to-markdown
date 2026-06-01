@@ -47,11 +47,14 @@ export function htmlToMarkdown(htmlString: string): string {
   // Remove script and style tags
   $('script, style').remove();
 
-  // Remove navigation/sidebar elements (Wikipedia, MediaWiki, generic nav)
+  // Remove navigation/sidebar elements (Wikipedia, MediaWiki, generic nav).
+  // Use `body > header` and `body > footer` (not bare `header`/`footer`) so that
+  // legitimate <header>/<footer> elements inside <article> or <main> are preserved.
   $('nav, [role="navigation"], .mw-navigation, #mw-navigation, ' +
     '.sidebar, #sidebar, .toc, #toc, ' +
     '.mw-portlet, .vector-toc, .navbox, .noprint, ' +
-    'header, footer, [role="banner"], [role="contentinfo"]').remove();
+    '[role="banner"], [role="contentinfo"], ' +
+    'body > header, body > footer').remove();
 
   // Remove empty elements
   $('*').each(function () {

@@ -1160,11 +1160,11 @@ describe('convertBatchToMarkdown()', () => {
     }
   });
 
-  it('Buffer input için inputId "buffer" olur', async () => {
+  it('Buffer input için inputId "buffer:0" olur', async () => {
     const results = await convertBatchToMarkdown([
       { input: Buffer.from('hello'), options: { forceExtension: '.txt' } },
     ]);
-    expect(results[0].inputId).toBe('buffer');
+    expect(results[0].inputId).toBe('buffer:0');
   });
 });
 
@@ -1245,9 +1245,40 @@ describe('convertEpubToMarkdown()', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 import { convertMsgToMarkdown } from '../converters/msg.ts';
 
+// Real fixture: msgreader's own test.msg (senderName="christoph@freiraum.xyz", subject="asdf")
+const MSG_FIXTURE_PATH = new URL(
+  '../../node_modules/msgreader/data/test.msg',
+  import.meta.url
+).pathname;
+
 describe('convertMsgToMarkdown()', () => {
-  it('geçersiz buffer için hata fırlatır veya boş çıktı döner', () => {
-    // msgreader is tolerant — may return empty fields rather than throw
+  it('gerçek MSG fixture\'ını okur ve gönderen adını içerir', () => {
+    const buf = readFileSync(MSG_FIXTURE_PATH);
+    const out = convertMsgToMarkdown(buf);
+    expect(out).toContain('christoph@freiraum.xyz');
+  });
+
+  it('gerçek MSG fixture\'ından konu satırını çıkarır', () => {
+    const buf = readFileSync(MSG_FIXTURE_PATH);
+    const out = convertMsgToMarkdown(buf);
+    expect(out).toContain('asdf');
+  });
+
+  it('gerçek MSG fixture çıktısı "# Email Message" başlığı içerir', () => {
+    const buf = readFileSync(MSG_FIXTURE_PATH);
+    const out = convertMsgToMarkdown(buf);
+    expect(out).toMatch(/^# Email Message/);
+  });
+
+  it('gerçek MSG fixture çıktısı string döndürür', () => {
+    const buf = readFileSync(MSG_FIXTURE_PATH);
+    const out = convertMsgToMarkdown(buf);
+    expect(typeof out).toBe('string');
+    expect(out.length).toBeGreaterThan(10);
+  });
+
+  it('geçersiz buffer için hata fırlatır veya string döner', () => {
+    // msgreader is tolerant — may return partial data rather than throw
     try {
       const out = convertMsgToMarkdown(Buffer.from('bu msg değil'));
       expect(typeof out).toBe('string');
@@ -1256,13 +1287,10 @@ describe('convertMsgToMarkdown()', () => {
     }
   });
 
-  it('convertToMarkdown .msg formatını hata yönetimiyle işler', async () => {
-    try {
-      const out = await convertToMarkdown(Buffer.from('fake msg'), { forceExtension: '.msg' });
-      expect(typeof out).toBe('string');
-    } catch (e: any) {
-      expect(e.message).toBeTruthy();
-    }
+  it('convertToMarkdown .msg formatını gerçek fixture ile işler', async () => {
+    const buf = readFileSync(MSG_FIXTURE_PATH);
+    const out = await convertToMarkdown(buf, { forceExtension: '.msg' });
+    expect(out).toContain('christoph@freiraum.xyz');
   });
 });
 
