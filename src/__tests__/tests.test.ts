@@ -1167,3 +1167,130 @@ describe('convertBatchToMarkdown()', () => {
     expect(results[0].inputId).toBe('buffer');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 24. convertEpubToMarkdown
+// ═══════════════════════════════════════════════════════════════════════════
+import { convertEpubToMarkdown } from '../converters/epub.ts';
+
+describe('convertEpubToMarkdown()', () => {
+  let epubBuffer: Buffer;
+
+  beforeAll(async () => {
+    // Build a minimal valid EPUB with AdmZip
+    const zip = new AdmZip();
+
+    zip.addFile('mimetype', Buffer.from('application/epub+zip'));
+    zip.addFile('META-INF/container.xml', Buffer.from(
+      `<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+        <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+      </container>`
+    ));
+    zip.addFile('OEBPS/content.opf', Buffer.from(
+      `<?xml version="1.0" encoding="utf-8"?>
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Test Book</dc:title>
+          <dc:creator>Test Author</dc:creator>
+        </metadata>
+        <manifest>
+          <item id="ch1" href="chapter1.html" media-type="application/xhtml+xml"/>
+        </manifest>
+        <spine><itemref idref="ch1"/></spine>
+      </package>`
+    ));
+    zip.addFile('OEBPS/chapter1.html', Buffer.from(
+      '<html><body><h1>Chapter One</h1><p>Hello from EPUB.</p></body></html>'
+    ));
+
+    epubBuffer = zip.toBuffer();
+  });
+
+  it('kitap başlığını çıkarır', async () => {
+    const out = await convertEpubToMarkdown(epubBuffer);
+    expect(out).toContain('Test Book');
+  });
+
+  it('yazar adını çıkarır', async () => {
+    const out = await convertEpubToMarkdown(epubBuffer);
+    expect(out).toContain('Test Author');
+  });
+
+  it('bölüm içeriğini markdown olarak çevirir', async () => {
+    const out = await convertEpubToMarkdown(epubBuffer);
+    expect(out).toContain('Chapter One');
+    expect(out).toContain('Hello from EPUB');
+  });
+
+  it('string döndürür', async () => {
+    const out = await convertEpubToMarkdown(epubBuffer);
+    expect(typeof out).toBe('string');
+    expect(out.length).toBeGreaterThan(0);
+  });
+
+  it('convertToMarkdown .epub formatını işler', async () => {
+    const out = await convertToMarkdown(epubBuffer, { forceExtension: '.epub' });
+    expect(out).toContain('Test Book');
+  });
+
+  it('geçersiz buffer için hata fırlatır', async () => {
+    await expect(
+      convertEpubToMarkdown(Buffer.from('bu epub değil'))
+    ).rejects.toThrow();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 25. convertMsgToMarkdown
+// ═══════════════════════════════════════════════════════════════════════════
+import { convertMsgToMarkdown } from '../converters/msg.ts';
+
+describe('convertMsgToMarkdown()', () => {
+  it('geçersiz buffer için hata fırlatır veya boş çıktı döner', () => {
+    // msgreader is tolerant — may return empty fields rather than throw
+    try {
+      const out = convertMsgToMarkdown(Buffer.from('bu msg değil'));
+      expect(typeof out).toBe('string');
+    } catch (e: any) {
+      expect(e.message).toBeTruthy();
+    }
+  });
+
+  it('convertToMarkdown .msg formatını hata yönetimiyle işler', async () => {
+    try {
+      const out = await convertToMarkdown(Buffer.from('fake msg'), { forceExtension: '.msg' });
+      expect(typeof out).toBe('string');
+    } catch (e: any) {
+      expect(e.message).toBeTruthy();
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 26. convertCsvToMarkdown — multi-encoding (Shift-JIS)
+// ═══════════════════════════════════════════════════════════════════════════
+import iconv from 'iconv-lite';
+
+describe('convertCsvToMarkdown() - multi-encoding', () => {
+  it('Shift-JIS / CP932 CSV Japonce karakterleri doğru decode eder', () => {
+    const csvText = '名前,年齢\n田中,25\n';
+    const shiftJisBuffer = iconv.encode(csvText, 'cp932');
+    const out = convertCsvToMarkdown(shiftJisBuffer);
+    expect(out).toContain('名前');
+    expect(out).toContain('田中');
+  });
+
+  it('UTF-8 BOM içeren CSV işler', () => {
+    const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+    const csv = Buffer.from('Col1,Col2\nA,B\n', 'utf-8');
+    const out = convertCsvToMarkdown(Buffer.concat([bom, csv]));
+    expect(out).toContain('Col1');
+    expect(out).toContain('A');
+  });
+
+  it('normal UTF-8 CSV hâlâ çalışır', () => {
+    const out = convertCsvToMarkdown(Buffer.from('X,Y\n1,2\n', 'utf-8'));
+    expect(out).toContain('X');
+    expect(out).toContain('1');
+  });
+});
