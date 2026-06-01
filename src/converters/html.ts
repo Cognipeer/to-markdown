@@ -46,7 +46,13 @@ export function htmlToMarkdown(htmlString: string): string {
 
   // Remove script and style tags
   $('script, style').remove();
-  
+
+  // Remove navigation/sidebar elements (Wikipedia, MediaWiki, generic nav)
+  $('nav, [role="navigation"], .mw-navigation, #mw-navigation, ' +
+    '.sidebar, #sidebar, .toc, #toc, ' +
+    '.mw-portlet, .vector-toc, .navbox, .noprint, ' +
+    'header, footer, [role="banner"], [role="contentinfo"]').remove();
+
   // Remove empty elements
   $('*').each(function () {
     const element = $(this);

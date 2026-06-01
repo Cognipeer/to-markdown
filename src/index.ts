@@ -12,6 +12,8 @@ import { convertExcelToMarkdown, convertCsvToMarkdown } from './converters/sprea
 import { convertAudioToMarkdown, convertImageToMarkdown } from './converters/media.js';
 import { convertPptxToMarkdown, convertZipToMarkdown } from './converters/archive.js';
 import { convertJsonToMarkdown, convertYamlToMarkdown } from './converters/data.js';
+import { convertEpubToMarkdown } from './converters/epub.js';
+import { convertMsgToMarkdown } from './converters/msg.js';
 export { convertUrlToMarkdown } from './converters/url.js';
 
 /**
@@ -92,6 +94,12 @@ export async function convertToMarkdown(
     case '.yaml':
     case '.yml':
       return convertYamlToMarkdown(buffer);
+
+    case '.epub':
+      return await convertEpubToMarkdown(buffer);
+
+    case '.msg':
+      return convertMsgToMarkdown(buffer);
 
     default:
       // Handle special cases based on URL
