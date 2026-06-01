@@ -61,9 +61,10 @@ describe('formatMarkdown()', () => {
     expect(result).toContain('# Başlık');
   });
 
-  it('büyük harfle başlayan kısa cümle başlık olur', () => {
+  it('büyük harfle başlayan düz satır artık başlığa dönüşmez (bug fix)', () => {
     const result = formatMarkdown('Kısa Başlık');
-    expect(result).toContain('## Kısa Başlık');
+    expect(result).not.toContain('## Kısa Başlık');
+    expect(result).toContain('Kısa Başlık'); // orijinal metin korunur
   });
 });
 
@@ -680,20 +681,22 @@ describe('convertZipToMarkdown()', () => {
     zipBuffer = zip.toBuffer();
   });
 
-  it('giriş metnini içerir', async () => {
-    const result = await convertZipToMarkdown(zipBuffer, {});
-    expect(result).toContain('zip');
-  });
-
   it('dosya adlarını listeler', async () => {
     const result = await convertZipToMarkdown(zipBuffer, {});
     expect(result).toContain('readme.txt');
     expect(result).toContain('data.csv');
   });
 
-  it('byte bilgisini içerir', async () => {
+  it('metin dosyası içeriğini içerir', async () => {
     const result = await convertZipToMarkdown(zipBuffer, {});
-    expect(result).toContain('bytes');
+    expect(result).toContain('Merhaba Dünya!');
+    expect(result).toContain('Alt klasör notu');
+  });
+
+  it('CSV içeriğini tablo olarak çevirir', async () => {
+    const result = await convertZipToMarkdown(zipBuffer, {});
+    // CSV converted to markdown table — header should appear
+    expect(result).toContain('A');
   });
 
   it('string döndürür', async () => {
@@ -1018,5 +1021,149 @@ describe('convertToMarkdown() - Dosya Yolu', () => {
       { fileName: 'data.csv' }
     );
     expect(result).toContain('A');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 21. convertJsonToMarkdown
+// ═══════════════════════════════════════════════════════════════════════════
+import { convertJsonToMarkdown, convertYamlToMarkdown } from '../converters/data.ts';
+import { convertBatchToMarkdown } from '../index.ts';
+
+describe('convertJsonToMarkdown()', () => {
+  it('düz objeyi markdown tablosuna çevirir', () => {
+    const obj = { name: 'Furkan', age: 30 };
+    const result = convertJsonToMarkdown(Buffer.from(JSON.stringify(obj)));
+    expect(result).toContain('name');
+    expect(result).toContain('Furkan');
+  });
+
+  it('array içeriğini listeler', () => {
+    const arr = [1, 2, 3];
+    const result = convertJsonToMarkdown(Buffer.from(JSON.stringify(arr)));
+    expect(result).toContain('1');
+    expect(result).toContain('2');
+  });
+
+  it('iç içe objeyi heading\'lerle çevirir', () => {
+    const obj = { section: { title: 'Hello', value: 42 } };
+    const result = convertJsonToMarkdown(Buffer.from(JSON.stringify(obj)));
+    expect(result).toContain('section');
+    expect(result).toContain('title');
+  });
+
+  it('geçersiz JSON için hata fırlatır', () => {
+    expect(() =>
+      convertJsonToMarkdown(Buffer.from('{not valid json'))
+    ).toThrow();
+  });
+
+  it('# JSON Document başlığıyla başlar', () => {
+    const result = convertJsonToMarkdown(Buffer.from('{"x":1}'));
+    expect(result).toContain('# JSON Document');
+  });
+
+  it('convertToMarkdown .json formatını işler', async () => {
+    const result = await convertToMarkdown(Buffer.from('{"hello":"world"}'), { forceExtension: '.json' });
+    expect(result).toContain('hello');
+    expect(result).toContain('world');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 22. convertYamlToMarkdown
+// ═══════════════════════════════════════════════════════════════════════════
+describe('convertYamlToMarkdown()', () => {
+  it('basit YAML key-value çevirir', () => {
+    const yaml = 'name: Furkan\ncity: Istanbul\n';
+    const result = convertYamlToMarkdown(Buffer.from(yaml));
+    expect(result).toContain('name');
+    expect(result).toContain('Furkan');
+  });
+
+  it('# YAML Document başlığıyla başlar', () => {
+    const result = convertYamlToMarkdown(Buffer.from('x: 1\n'));
+    expect(result).toContain('# YAML Document');
+  });
+
+  it('liste içeren YAML çevirir', () => {
+    const yaml = 'items:\n  - apple\n  - banana\n';
+    const result = convertYamlToMarkdown(Buffer.from(yaml));
+    expect(result).toContain('items');
+  });
+
+  it('geçersiz YAML için hata fırlatır', () => {
+    const badYaml = 'key: :\n  - broken: [yaml';
+    expect(() =>
+      convertYamlToMarkdown(Buffer.from(badYaml))
+    ).toThrow();
+  });
+
+  it('convertToMarkdown .yaml formatını işler', async () => {
+    const result = await convertToMarkdown(Buffer.from('greeting: hello\n'), { forceExtension: '.yaml' });
+    expect(result).toContain('greeting');
+  });
+
+  it('convertToMarkdown .yml uzantısıyla çalışır', async () => {
+    const result = await convertToMarkdown(Buffer.from('key: value\n'), { forceExtension: '.yml' });
+    expect(result).toContain('key');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 23. convertBatchToMarkdown
+// ═══════════════════════════════════════════════════════════════════════════
+describe('convertBatchToMarkdown()', () => {
+  it('birden fazla girişi işler', async () => {
+    const results = await convertBatchToMarkdown([
+      { input: Buffer.from('<h1>Başlık</h1>'), options: { forceExtension: '.html' } },
+      { input: Buffer.from('A,B\n1,2'), options: { forceExtension: '.csv' } },
+    ]);
+    expect(results).toHaveLength(2);
+    expect(results[0].result).toContain('Başlık');
+    expect(results[1].result).toContain('A');
+  });
+
+  it('hata veren girişte error alanı döner', async () => {
+    const results = await convertBatchToMarkdown([
+      { input: Buffer.from('geçersiz zip'), options: { forceExtension: '.zip' } },
+    ]);
+    expect(results[0].error).toBeTruthy();
+    expect(results[0].result).toBeUndefined();
+  });
+
+  it('boş array için boş dizi döner', async () => {
+    const results = await convertBatchToMarkdown([]);
+    expect(results).toHaveLength(0);
+  });
+
+  it('karışık başarılı/başarısız sonuçları işler', async () => {
+    const results = await convertBatchToMarkdown([
+      { input: Buffer.from('{"key":"val"}'), options: { forceExtension: '.json' } },
+      { input: Buffer.from('bozuk zip içeriği'), options: { forceExtension: '.zip' } },
+    ]);
+    expect(results).toHaveLength(2);
+    expect(results[0].result).toBeTruthy();
+    expect(results[1].error).toBeTruthy();
+  });
+
+  it('inputId string path için dosya adını kullanır', async () => {
+    const tmpDir = join(process.cwd(), 'test-output-temp');
+    const filePath = join(tmpDir, `batch-test-${Date.now()}.html`);
+    writeFileSync(filePath, '<p>Batch test</p>', 'utf-8');
+    try {
+      const results = await convertBatchToMarkdown([{ input: filePath }]);
+      expect(results[0].inputId).toBe(filePath);
+      expect(results[0].result).toBeTruthy();
+    } finally {
+      unlinkSync(filePath);
+    }
+  });
+
+  it('Buffer input için inputId "buffer" olur', async () => {
+    const results = await convertBatchToMarkdown([
+      { input: Buffer.from('hello'), options: { forceExtension: '.txt' } },
+    ]);
+    expect(results[0].inputId).toBe('buffer');
   });
 });
