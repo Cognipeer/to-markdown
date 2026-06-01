@@ -61,14 +61,17 @@
   "homepage": "https://cognipeer.github.io/to-markdown",
   "dependencies": {
     "@opendocsg/pdf2md": "^0.2.1",
+    "@types/js-yaml": "^4.0.9",
     "adm-zip": "^0.5.16",
     "cheerio": "^1.0.0",
     "file-type": "^16.5.4",
     "image-size": "^2.0.2",
+    "js-yaml": "^4.2.0",
     "mammoth": "^1.8.0",
     "mime-types": "^2.1.35",
     "music-metadata": "^11.0.5",
     "papaparse": "^5.5.2",
+    "sharp": "^0.34.5",
     "turndown": "^7.2.0",
     "xlsx": "^0.18.5",
     "xml2js": "^0.6.2"
