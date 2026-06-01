@@ -40,5 +40,5 @@ export async function convertUrlToMarkdown(
   }
 
   const html = await response.text();
-  return convertHtmlToMarkdown(Buffer.from(html, 'utf-8'), { ...options, url: targetUrl });
+  return convertHtmlToMarkdown(Buffer.from(html, 'utf-8'));
 }
