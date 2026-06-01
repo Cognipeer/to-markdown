@@ -42,6 +42,8 @@ export enum FileExtension {
   JSON = '.json',
   YAML = '.yaml',
   YML = '.yml',
+  EPUB = '.epub',
+  MSG = '.msg',
 }
 
 /**
