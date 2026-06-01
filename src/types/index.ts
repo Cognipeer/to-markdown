@@ -39,6 +39,9 @@ export enum FileExtension {
   JPEG = '.jpeg',
   PNG = '.png',
   GIF = '.gif',
+  JSON = '.json',
+  YAML = '.yaml',
+  YML = '.yml',
 }
 
 /**
@@ -80,4 +83,26 @@ export interface AudioMetadata {
 export interface FileTypeResult {
   ext: string;
   mime: string;
+}
+
+/**
+ * A single item for batch conversion
+ */
+export interface BatchInput {
+  /** File path, base64 data URL, or Buffer */
+  input: ConverterInput;
+  /** Optional converter options (e.g. forceExtension) */
+  options?: ConverterOptions;
+}
+
+/**
+ * Result for a single batch conversion item
+ */
+export interface BatchResult {
+  /** Input identifier — file path if string, 'buffer' for Buffer inputs */
+  inputId: string;
+  /** Converted Markdown content, present on success */
+  result?: string;
+  /** Error message, present on failure */
+  error?: string;
 }
