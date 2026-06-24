@@ -1,4 +1,15 @@
 /**
+ * OCR options for image/PDF text extraction via Tesseract.js
+ * Requires optional peer dependency: npm install tesseract.js
+ */
+export interface OCROptions {
+  /** Tesseract language code (default: 'eng') */
+  lang?: string;
+  /** PDF OCR mode: 'auto' = fallback when no text found, 'always' = always OCR, 'never' = skip (default: 'auto') */
+  pdfMode?: 'auto' | 'always' | 'never';
+}
+
+/**
  * Converter options for converting various file formats to Markdown
  */
 export interface ConverterOptions {
@@ -8,6 +19,8 @@ export interface ConverterOptions {
   forceExtension?: string;
   /** Original URL (used for web content like YouTube or Bing search) */
   url?: string;
+  /** Enable OCR for images and scanned PDFs (opt-in, requires tesseract.js) */
+  ocr?: boolean | OCROptions;
 }
 
 /**

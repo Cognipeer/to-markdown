@@ -9,6 +9,12 @@ const pkg = require("./package.json");
 const external = [
   ...Object.keys(pkg.dependencies || {}),
   ...Object.keys(pkg.peerDependencies || {}),
+  // optional peer deps (OCR / PDF rendering / tokenizer)
+  "tesseract.js",
+  "pdfjs-dist",
+  "@napi-rs/canvas",
+  "canvas",
+  "gpt-tokenizer",
   "fs", "path", "node:fs", "node:path", "node:crypto", "node:stream",
   "node:buffer", "node:util", "node:events", "node:os", "node:url",
   "node:http", "node:https", "node:net", "node:tls", "node:zlib",

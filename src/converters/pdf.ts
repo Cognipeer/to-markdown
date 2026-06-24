@@ -1,4 +1,5 @@
 import { getDocumentProxy } from 'unpdf';
+import type { OCROptions } from '../types/index.js';
 
 // ── Constants (ported from MarkItDown _pdf_converter.py) ─────────────────
 const PARTIAL_NUMBERING_RE = /^\.\d+$/;
@@ -291,7 +292,10 @@ function extractFormContentFromWords(words: PDFWord[], pageWidth: number): strin
  *    (equivalent to pdfminer.high_level.extract_text fallback).
  * 3. Post-process MasterFormat-style partial numbering (.1, .2 → merge).
  */
-export async function convertPdfToMarkdown(buffer: Buffer): Promise<string> {
+export async function convertPdfToMarkdown(
+  buffer: Buffer,
+  ocr?: boolean | OCROptions
+): Promise<string> {
   const pdf = await getDocumentProxy(new Uint8Array(buffer));
 
   const markdownChunks: string[] = [];
@@ -337,5 +341,38 @@ export async function convertPdfToMarkdown(buffer: Buffer): Promise<string> {
     markdown = markdownChunks.join('\n\n');
   }
 
-  return mergePartialNumberingLines(markdown);
+  const extractedText = mergePartialNumberingLines(markdown);
+
+  // ── OCR integration (opt-in) ─────────────────────────────────────────────
+  if (ocr) {
+    const ocrMode = typeof ocr === 'object' ? (ocr.pdfMode ?? 'auto') : 'auto';
+    const ocrLang = typeof ocr === 'object' ? ocr.lang : undefined;
+    const shouldOcr =
+      ocrMode === 'always' ||
+      (ocrMode === 'auto' && !extractedText.trim());
+
+    if (shouldOcr) {
+      try {
+        const { renderPdfPageToPng } = await import('../utils/pdfRender.js');
+        const { ocrImage } = await import('../utils/ocr.js');
+        const pdf2 = await getDocumentProxy(new Uint8Array(buffer));
+        const ocrTexts: string[] = [];
+        for (let p = 1; p <= pdf2.numPages; p++) {
+          try {
+            const png = await renderPdfPageToPng(buffer, p);
+            const text = await ocrImage(png, { lang: ocrLang ?? 'eng' });
+            if (text) ocrTexts.push(text);
+          } catch { /* skip unreadable pages */ }
+        }
+        if (ocrTexts.length > 0) return ocrTexts.join('\n\n');
+      } catch (err: any) {
+        if (!extractedText.trim()) {
+          throw new Error(`PDF OCR failed: ${err.message}`);
+        }
+        // OCR failed but text extraction worked — fall through
+      }
+    }
+  }
+
+  return extractedText;
 }

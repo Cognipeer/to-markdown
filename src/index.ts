@@ -1,20 +1,26 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { isAbsolute, join } from 'path';
-import type { ConverterInput, ConverterOptions, FileExtension, BatchInput, BatchResult } from './types/index.js';
-import { detectFileType } from './utils/fileDetection.js';
-import { convertPdfToMarkdown } from './converters/pdf.js';
-import { convertDocxToMarkdown } from './converters/docx.js';
-import { convertHtmlToMarkdown } from './converters/html.js';
-import { convertTextFileToMarkdown, convertYoutubeToMarkdown, convertBingSerpToMarkdown } from './converters/text.js';
-import { convertIpynbToMarkdown } from './converters/notebook.js';
-import { convertRssAtomToMarkdown } from './converters/xml.js';
-import { convertExcelToMarkdown, convertCsvToMarkdown } from './converters/spreadsheet.js';
-import { convertAudioToMarkdown, convertImageToMarkdown } from './converters/media.js';
-import { convertPptxToMarkdown, convertZipToMarkdown } from './converters/archive.js';
-import { convertJsonToMarkdown, convertYamlToMarkdown } from './converters/data.js';
-import { convertEpubToMarkdown } from './converters/epub.js';
-import { convertMsgToMarkdown } from './converters/msg.js';
+import { convertToMarkdown } from './convert.js';
+import type { BatchInput, BatchResult } from './types/index.js';
+
+// ── Re-exports ─────────────────────────────────────────────────────────────
+export { convertToMarkdown } from './convert.js';
 export { convertUrlToMarkdown } from './converters/url.js';
+
+// New AI/RAG API
+export { convertToRichMarkdown } from './rich.js';
+export type { RichOptions, RichOutput } from './rich.js';
+
+export { chunkMarkdown } from './utils/chunker.js';
+export type { Chunk, ChunkMeta, ChunkOptions } from './utils/chunker.js';
+
+export { countTokens } from './utils/tokenizer.js';
+export type { TokenizerMode } from './utils/tokenizer.js';
+
+export { extractSections, buildFrontmatter, emitFrontmatter } from './utils/metadata.js';
+export type { Section, Frontmatter } from './utils/metadata.js';
+
+export { ocrImage } from './utils/ocr.js';
 
 /**
  * Main function to convert various file formats to Markdown
@@ -35,85 +41,12 @@ export { convertUrlToMarkdown } from './converters/url.js';
  * // Convert from base64
  * const base64 = 'data:application/pdf;base64,JVBERi0xLjUNCiW...';
  * const result = await convertToMarkdown(base64);
+ * 
+ * // With OCR (opt-in, requires: npm install tesseract.js)
+ * const result = await convertToMarkdown('scan.pdf', { ocr: true });
  * ```
  */
-export async function convertToMarkdown(
-  input: ConverterInput,
-  options: ConverterOptions = {}
-): Promise<string> {
-  const { buffer, extension: ext } = await detectFileType(input, options);
-
-  switch (ext) {
-    case '.pdf':
-      return await convertPdfToMarkdown(buffer);
-
-    case '.docx':
-      return await convertDocxToMarkdown(buffer);
-
-    case '.html':
-    case '.htm':
-      return convertHtmlToMarkdown(buffer);
-
-    case '.txt':
-      return convertTextFileToMarkdown(buffer);
-
-    case '.ipynb':
-      return await convertIpynbToMarkdown(buffer);
-
-    case '.xml':
-    case '.rss':
-    case '.atom':
-      return await convertRssAtomToMarkdown(buffer);
-
-    case '.xlsx':
-    case '.xls':
-      return await convertExcelToMarkdown(buffer);
-
-    case '.csv':
-      return convertCsvToMarkdown(buffer);
-
-    case '.mp3':
-    case '.wav':
-      return await convertAudioToMarkdown(buffer, ext);
-
-    case '.pptx':
-      return await convertPptxToMarkdown(buffer);
-
-    case '.zip':
-      return await convertZipToMarkdown(buffer, options);
-
-    case '.jpg':
-    case '.jpeg':
-    case '.png':
-    case '.gif':
-      return await convertImageToMarkdown(buffer, ext);
-
-    case '.json':
-      return convertJsonToMarkdown(buffer);
-
-    case '.yaml':
-    case '.yml':
-      return convertYamlToMarkdown(buffer);
-
-    case '.epub':
-      return await convertEpubToMarkdown(buffer);
-
-    case '.msg':
-      return convertMsgToMarkdown(buffer);
-
-    default:
-      // Handle special cases based on URL
-      if (options.url && options.url.includes('youtube.com')) {
-        return convertYoutubeToMarkdown(buffer, options.url);
-      }
-
-      if (options.url && options.url.includes('bing.com/search')) {
-        return convertBingSerpToMarkdown(buffer, options.url);
-      }
-
-      return convertTextFileToMarkdown(buffer);
-  }
-}
+// convertToMarkdown is re-exported above from './convert.js'
 
 /**
  * Saves markdown content to a file
