@@ -1,5 +1,4 @@
 import { imageSize as sizeOf } from 'image-size';
-import { parseBuffer } from 'music-metadata';
 import { formatMarkdown } from '../utils/markdown.js';
 import type { ImageMetadata, AudioMetadata, OCROptions } from '../types/index.js';
 
@@ -59,6 +58,7 @@ export async function convertAudioToMarkdown(
   ext: string
 ): Promise<string> {
   try {
+    const { parseBuffer } = await import('music-metadata');
     const metadata = await parseBuffer(buffer);
     let md = '';
 
