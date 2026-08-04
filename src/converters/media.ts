@@ -90,6 +90,7 @@ export async function convertAudioToMarkdown(
   ext: string
 ): Promise<string> {
   try {
+    const { parseBuffer } = await import('music-metadata');
     const metadata = await parseBuffer(buffer);
     let md = '';
 
