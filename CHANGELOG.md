@@ -5,13 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.2.0] - 2026-07-22
+## [3.2.0] - 2026-08-17
 
 ### Added
 
 - OCR provider `'handler'`: pass a custom async `handler(buffer, context)` callback; the library performs no HTTP requests in this mode
 - `OCRHandler`, `OCRHandlerContext`, and `handler` field on `OCROptions`
 - OCR handler context includes page metadata (PDF), MIME hint, source extension, fileName, and image dimensions
+
+## [3.1.1] - 2026-08-03
+
+### Changed
+
+- `music-metadata` is now lazy-loaded (dynamic `import()`) inside the audio converter instead of a top-level import, avoiding its startup cost for consumers that never process audio files
+
+## [3.1.0] - 2026-07-17
+
+### Fixed
+
+- HTML to Markdown conversion no longer collapses tables, fenced code blocks, and ordered/nested lists onto a single line; `formatMarkdown` is now structure-aware and preserves per-line formatting for tables, list items, blockquotes, headings, and horizontal rules
+- Ordered (`<ol>`) and nested list numbering/indentation is preserved instead of flattening every `<li>` into a top-level bullet
+- Removed stray `<head>`/`<title>` leakage into the converted body
+- Fixed whitespace handling inside `<pre>` blocks and parsing of void elements like `<img>`
+- Spreadsheet/CSV table output (which shares the same formatting pipeline) is no longer mangled
+
+## [3.0.3] - 2026-07-06
+
+### Fixed
+
+- PDF page rendering now delegates to `unpdf`'s bundled `renderPageAsImage()` instead of a manual `pdfjs-dist` pipeline, avoiding version conflicts when a host application bundles a different `pdfjs-dist` version (this previously caused scanned PDF OCR to silently return empty results)
+
+### Added
+
+- `canvas` added as a direct dependency for Node.js PDF rendering
+
+## [3.0.2] - 2026-07-02
+
+No functional changes — republished to reconcile the direct 3.0.1 hotfix commit with the corresponding pull request (#9) merge.
+
+## [3.0.1] - 2026-07-02
+
+### Fixed
+
+- OCR VLM API compatibility: `max_tokens` to `max_completion_tokens` for OpenAI VLM requests, since newer models (gpt-5.x, o4-mini) rejected the old parameter — fixes OCR support for 12 additional models
+- PDF rendering: added a Node.js canvas factory required by `pdfjs-dist` v4 (previously failed with `Cannot read properties of undefined (reading 'createCanvas')`)
+- Rendering failures are now skipped per-page as expected, while OCR API errors correctly propagate to the caller instead of being silently swallowed
+
+## [3.0.0] - 2026-06-26
+
+### Added
+
+- OCR support for images and scanned PDFs, with `tesseract.js` bundled as a direct dependency (default provider)
+- Multi-provider VLM-based OCR: `openai-vlm`, `anthropic-vlm`, `ollama-vlm`, `azure-vision`, `custom-vlm`
+- New converters: EPUB, URL, and structured data
+- Benchmark and test suite (Vitest) covering real-world files across all supported formats
+
+## [2.0.1] - 2025-10-09
+
+### Changed
+
+- Image metadata extraction now uses the `image-size` package
 
 ## [2.0.0] - 2025-10-09
 
@@ -42,15 +95,15 @@ This is a major rewrite of the library in TypeScript with improved architecture 
 
 ### 🔧 Changed
 
-- **Package Structure**: 
+- **Package Structure**:
   - Source files now in `src/*.ts` instead of `src/*.js`
   - Built files in `dist/` with proper type declarations
   - Improved package.json exports for better ESM/CJS compatibility
-- **Build Process**: 
+- **Build Process**:
   - TypeScript compilation with `tsc`
   - Rollup bundling for optimized output
   - Separate ESM and CJS builds
-- **Version Bump**: 1.0.1 → 2.0.0 (breaking in terms of package structure)
+- **Version Bump**: 1.0.1 to 2.0.0 (breaking in terms of package structure)
 
 ### 📚 Improved
 
@@ -108,6 +161,7 @@ This is a major rewrite of the library in TypeScript with improved architecture 
 ---
 
 For more information, see:
+
 - [README.md](./README.md)
 - [Documentation](https://cognipeer.github.io/to-markdown/)
 - [Contributing Guidelines](./CONTRIBUTING.md)
