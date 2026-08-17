@@ -2,9 +2,9 @@ name: Build and Deploy Docs
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -14,45 +14,45 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      
+          node-version: "20"
+          cache: "npm"
+
       - name: Install dependencies
         run: npm install
-      
+
       - name: Build TypeScript
         run: npm run build
-      
+
       - name: Run tests
         run: npm test || true
-  
-  deploy-docs:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: build
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./docs
-          destination: ./_site
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-      
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+
+  # deploy-docs:
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   needs: build
+
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Setup Pages
+  #       uses: actions/configure-pages@v5
+
+  #     - name: Build with Jekyll
+  #       uses: actions/jekyll-build-pages@v1
+  #       with:
+  #         source: ./docs
+  #         destination: ./_site
+
+  #     - name: Upload artifact
+  #       uses: actions/upload-pages-artifact@v3
+
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v4
