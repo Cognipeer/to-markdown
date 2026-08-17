@@ -73,12 +73,26 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### Version 3.0.0 (Latest)
+### Version 3.2.0 (Latest)
+
+- 🧩 Added `'handler'` OCR provider — supply a custom async callback (with page/image context) and the library makes no HTTP requests of its own
+
+### Version 3.1.x
+
+- 🩹 Fixed HTML→Markdown conversion collapsing tables, fenced code blocks, and ordered/nested lists
+- ⚡ Lazy-loaded `music-metadata` in the audio converter to reduce startup cost
+
+### Version 3.0.x
 
 - 🔎 Added OCR support for images and scanned PDFs
 - ⚙️ Added `ocr` option in `ConverterOptions` (`boolean | OCROptions`)
 - 🌐 Added OCR provider support: `tesseract`, `openai-vlm`, `anthropic-vlm`, `ollama-vlm`, `azure-vision`, `custom-vlm`
 - 🧠 Added PDF OCR modes: `auto`, `always`, `never`
+- 🐛 Fixed OCR VLM API compatibility and PDF rendering reliability
+
+### Version 2.0.1
+
+- 🖼️ Image metadata extraction now uses `image-size`
 
 ### Version 2.0.0
 
@@ -92,6 +106,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ### Version 1.0.1
 
 - Initial release with JavaScript implementation
+
+📖 See [CHANGELOG.md](./CHANGELOG.md) for the complete, detailed release history.
 
 ## 📄 License
 
