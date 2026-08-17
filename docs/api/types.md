@@ -107,6 +107,70 @@ interface AudioMetadata {
 
 ---
 
+## OCR Types
+
+### OCRProvider
+
+```typescript
+type OCRProvider =
+  | 'tesseract'
+  | 'openai-vlm'
+  | 'anthropic-vlm'
+  | 'ollama-vlm'
+  | 'azure-vision'
+  | 'custom-vlm'
+  | 'handler';
+```
+
+Use `'handler'` when you supply your own async OCR function. The library does not perform HTTP requests in that mode.
+
+---
+
+### OCRHandlerContext
+
+Metadata passed to a custom OCR handler.
+
+```typescript
+interface OCRHandlerContext {
+  page?: number;
+  pageCount?: number;
+  mimeType?: string;
+  sourceExtension?: string;
+  fileName?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+}
+```
+
+---
+
+### OCRHandler
+
+```typescript
+type OCRHandler = (
+  buffer: Buffer,
+  context: OCRHandlerContext
+) => Promise<string>;
+```
+
+---
+
+### OCROptions
+
+```typescript
+interface OCROptions {
+  provider?: OCRProvider;
+  lang?: string;
+  pdfMode?: 'auto' | 'always' | 'never';
+  vlm?: VLMOptions;
+  handler?: OCRHandler;
+}
+```
+
+When `provider` is `'handler'`, `handler` is required.
+
+---
+
 ## Internal Types
 
 ### TurndownOptions

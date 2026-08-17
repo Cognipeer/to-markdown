@@ -45,7 +45,7 @@ export async function convertToMarkdown(
 
   switch (ext) {
     case '.pdf':
-      return await convertPdfToMarkdown(buffer, options.ocr);
+      return await convertPdfToMarkdown(buffer, options.ocr, options.fileName);
 
     case '.docx':
       return await convertDocxToMarkdown(buffer);
@@ -86,7 +86,7 @@ export async function convertToMarkdown(
     case '.jpeg':
     case '.png':
     case '.gif':
-      return await convertImageToMarkdown(buffer, ext, options.ocr);
+      return await convertImageToMarkdown(buffer, ext, options.ocr, options.fileName);
 
     case '.json':
       return convertJsonToMarkdown(buffer);

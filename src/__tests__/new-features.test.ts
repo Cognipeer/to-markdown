@@ -25,6 +25,7 @@ import {
 import { ocrImage } from "../utils/ocr.ts";
 import { renderPdfPageToPng } from "../utils/pdfRender.ts";
 import { countTokens } from "../utils/tokenizer.ts";
+import { convertImageToMarkdown } from "../converters/media.ts";
 
 // ── New main API ─────────────────────────────────────────────────────────
 import { convertToRichMarkdown } from "../rich.ts";
@@ -34,6 +35,7 @@ import {
   convertBatchToMarkdown,
   convertToMarkdown,
   saveToMarkdownFile,
+  type OCRHandlerContext,
 } from "../index.ts";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -498,25 +500,121 @@ describe("ocrImage()", () => {
       ocrImage(dummyBuf, { provider: 'azure-vision', vlm: { model: 'vision', apiKey: 'key' } })
     ).rejects.toThrow(/apiBase.*Azure endpoint/i);
   });
+
+  it("throws when handler provider is missing handler callback", async () => {
+    const dummyBuf = Buffer.alloc(16);
+    await expect(
+      ocrImage(dummyBuf, { provider: 'handler' })
+    ).rejects.toThrow(/handler.*requires opts\.handler/i);
+  });
+
+  it("calls handler with buffer and context and trims result", async () => {
+    const dummyBuf = Buffer.from("image-bytes");
+    const received: { buffer?: Buffer; context?: OCRHandlerContext } = {};
+
+    const text = await ocrImage(
+      dummyBuf,
+      {
+        provider: 'handler',
+        handler: async (buffer, context) => {
+          received.buffer = buffer;
+          received.context = context;
+          return "  hello ocr  ";
+        },
+      },
+      {
+        page: 2,
+        pageCount: 5,
+        mimeType: 'image/png',
+        sourceExtension: '.pdf',
+        fileName: 'scan.pdf',
+      },
+    );
+
+    expect(text).toBe("hello ocr");
+    expect(received.buffer).toBe(dummyBuf);
+    expect(received.context).toEqual({
+      page: 2,
+      pageCount: 5,
+      mimeType: 'image/png',
+      sourceExtension: '.pdf',
+      fileName: 'scan.pdf',
+    });
+  });
+
+  it("convertImageToMarkdown passes image context to handler", async () => {
+    const png1x1 = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    let receivedContext: OCRHandlerContext | undefined;
+
+    const result = await convertImageToMarkdown(
+      png1x1,
+      ".png",
+      {
+        provider: 'handler',
+        handler: async (_buffer, context) => {
+          receivedContext = context;
+          return "receipt total 42";
+        },
+      },
+      "receipt.png",
+    );
+
+    expect(result).toContain("## Extracted Text");
+    expect(result).toContain("receipt total 42");
+    expect(receivedContext).toMatchObject({
+      sourceExtension: ".png",
+      fileName: "receipt.png",
+      mimeType: "image/png",
+      imageWidth: 1,
+      imageHeight: 1,
+    });
+  });
+
+  it("prefers detected image format over fileName for mimeType", async () => {
+    const png1x1 = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    let receivedContext: OCRHandlerContext | undefined;
+
+    await convertImageToMarkdown(
+      png1x1,
+      ".png",
+      {
+        provider: "handler",
+        handler: async (_buffer, context) => {
+          receivedContext = context;
+          return "ok";
+        },
+      },
+      "scan.pdf",
+    );
+
+    expect(receivedContext?.mimeType).toBe("image/png");
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────
 // 7. renderPdfPageToPng — throws informative error when deps are missing
 // ───────────────────────────────────────────────────────────────────────────
 describe("renderPdfPageToPng()", () => {
-  it("throws informative error if pdfjs-dist or canvas is not installed", async () => {
+  it("throws on invalid PDF buffer", async () => {
     const dummyBuf = Buffer.alloc(16);
     await expect(renderPdfPageToPng(dummyBuf)).rejects.toThrow(
-      /pdfjs-dist|canvas/i,
+      /Invalid PDF|pdfjs-dist|canvas|npm install/i,
     );
   });
 
-  it("error message includes npm install instruction", async () => {
+  it("error message is informative when rendering fails", async () => {
     const dummyBuf = Buffer.alloc(16);
     try {
       await renderPdfPageToPng(dummyBuf);
+      expect.unreachable("renderPdfPageToPng should reject invalid PDF input");
     } catch (err: any) {
-      expect(err.message).toMatch(/npm install/i);
+      expect(err.message).toMatch(/Invalid PDF|npm install/i);
     }
   });
 });

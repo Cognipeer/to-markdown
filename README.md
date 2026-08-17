@@ -195,10 +195,11 @@ Converts various file formats to Markdown.
 
 `OCROptions` includes:
 
-- `provider?: 'tesseract' | 'openai-vlm' | 'anthropic-vlm' | 'ollama-vlm' | 'azure-vision' | 'custom-vlm'`
+- `provider?: 'tesseract' | 'openai-vlm' | 'anthropic-vlm' | 'ollama-vlm' | 'azure-vision' | 'custom-vlm' | 'handler'`
 - `lang?: string` - Tesseract language code (default: `eng`)
 - `pdfMode?: 'auto' | 'always' | 'never'` - PDF OCR mode (default: `auto`)
 - `vlm?: { model: string; apiKey?: string; apiBase?: string; prompt?: string; maxTokens?: number }`
+- `handler?: (buffer, context) => Promise<string>` - Custom async OCR callback (required when `provider: 'handler'`; library makes no HTTP calls)
 
 **Returns:** `Promise<string>` - The converted markdown content
 
@@ -226,6 +227,18 @@ const imageText = await convertToMarkdown("./receipt.png", {
 // 3) OCR PDF only when native text extraction is empty
 const autoFallback = await convertToMarkdown("./document.pdf", {
   ocr: { pdfMode: "auto" },
+});
+
+// 4) Custom OCR handler — you control the OCR call (no fetch inside the library)
+const customOcr = await convertToMarkdown("./scan.pdf", {
+  ocr: {
+    provider: "handler",
+    pdfMode: "auto",
+    handler: async (buffer, context) => {
+      // context: page, pageCount, mimeType, sourceExtension, fileName, imageWidth, imageHeight
+      return await myOcrSdk.recognize(buffer, context);
+    },
+  },
 });
 ```
 

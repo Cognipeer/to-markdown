@@ -16,6 +16,7 @@ interface ConverterOptions {
   fileName?: string;
   forceExtension?: string;
   url?: string;
+  ocr?: boolean | OCROptions;
 }
 ```
 
@@ -82,6 +83,26 @@ const markdown = await convertToMarkdown(htmlBuffer, {
   url: 'https://www.bing.com/search?q=...'
 });
 ```
+
+---
+
+### ocr
+
+- **Type:** `boolean | OCROptions` (optional)
+- **Description:** Enable OCR for images and scanned PDFs. Use `provider: 'handler'` with a custom `handler(buffer, context)` callback when you want full control over OCR (the library performs no HTTP requests in that mode).
+
+**Example:**
+```typescript
+const markdown = await convertToMarkdown("scan.pdf", {
+  ocr: {
+    provider: "handler",
+    pdfMode: "auto",
+    handler: async (buffer, context) => myOcr(buffer, context),
+  },
+});
+```
+
+See [Type Definitions]({{ site.baseurl }}{% link api/types.md %}) for `OCROptions`, `OCRHandler`, and `OCRHandlerContext`.
 
 ## Usage Examples
 

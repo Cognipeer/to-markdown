@@ -6,6 +6,7 @@
  * - `'ollama-vlm'`   — Ollama local VLM (llava, bakllava, …)
  * - `'azure-vision'` — Azure Computer Vision Read API
  * - `'custom-vlm'`   — Any OpenAI-compatible vision endpoint
+ * - `'handler'`      — User-supplied async callback (no HTTP calls by the library)
  */
 export type OCRProvider =
   | 'tesseract'
@@ -13,7 +14,32 @@ export type OCRProvider =
   | 'anthropic-vlm'
   | 'ollama-vlm'
   | 'azure-vision'
-  | 'custom-vlm';
+  | 'custom-vlm'
+  | 'handler';
+
+/**
+ * Context passed to a custom OCR handler.
+ */
+export interface OCRHandlerContext {
+  /** 1-based page number (PDF OCR only) */
+  page?: number;
+  /** Total pages in the PDF */
+  pageCount?: number;
+  /** MIME hint: image/png for PDF pages, image/jpeg etc. for image files */
+  mimeType?: string;
+  /** Source file extension: .pdf, .png, … */
+  sourceExtension?: string;
+  /** fileName from ConverterOptions, when provided */
+  fileName?: string;
+  /** Source image dimensions, when known */
+  imageWidth?: number;
+  imageHeight?: number;
+}
+
+export type OCRHandler = (
+  buffer: Buffer,
+  context: OCRHandlerContext
+) => Promise<string>;
 
 /**
  * Configuration for VLM-based OCR providers.
@@ -52,6 +78,8 @@ export interface OCROptions {
   pdfMode?: 'auto' | 'always' | 'never';
   /** VLM configuration — required when provider is any VLM type */
   vlm?: VLMOptions;
+  /** Required when provider is 'handler'. Library performs no HTTP calls. */
+  handler?: OCRHandler;
 }
 
 /**

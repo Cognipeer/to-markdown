@@ -294,7 +294,8 @@ function extractFormContentFromWords(words: PDFWord[], pageWidth: number): strin
  */
 export async function convertPdfToMarkdown(
   buffer: Buffer,
-  ocr?: boolean | OCROptions
+  ocr?: boolean | OCROptions,
+  fileName?: string
 ): Promise<string> {
   const pdf = await getDocumentProxy(new Uint8Array(buffer));
 
@@ -362,7 +363,13 @@ export async function convertPdfToMarkdown(
           try {
             png = await renderPdfPageToPng(buffer, p);
           } catch { /* skip unrenderable pages */ continue; }
-          const text = await ocrImage(png, ocrOpts); // API errors propagate to outer catch
+          const text = await ocrImage(png, ocrOpts, {
+            page: p,
+            pageCount: pdf2.numPages,
+            mimeType: 'image/png',
+            sourceExtension: '.pdf',
+            fileName,
+          }); // API errors propagate to outer catch
           if (text) ocrTexts.push(text);
         }
         if (ocrTexts.length > 0) return ocrTexts.join('\n\n');

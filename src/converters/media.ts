@@ -1,20 +1,46 @@
 import { imageSize as sizeOf } from 'image-size';
+import { lookup } from 'mime-types';
+import { parseBuffer } from 'music-metadata';
 import { formatMarkdown } from '../utils/markdown.js';
-import type { ImageMetadata, AudioMetadata, OCROptions } from '../types/index.js';
+import type { OCROptions } from '../types/index.js';
+
+function imageMimeType(
+  ext: string,
+  fileName?: string,
+  formatType?: string
+): string | undefined {
+  if (formatType) {
+    const fromDetectedFormat = lookup(
+      `file.${formatType === 'jpg' ? 'jpeg' : formatType}`
+    );
+    if (fromDetectedFormat) return fromDetectedFormat;
+  }
+
+  const normalizedExt = (ext.startsWith('.') ? ext : `.${ext}`).toLowerCase();
+  const fromExtension = lookup(`file${normalizedExt}`);
+  if (fromExtension) return fromExtension;
+
+  const fromFileName = fileName ? lookup(fileName) : false;
+  if (fromFileName) return fromFileName;
+
+  return undefined;
+}
 
 /**
  * Converts image buffer to Markdown with metadata.
  * Pass `ocr: true` (or an OCROptions object) to also extract text via Tesseract.js.
  * Requires optional peer dep for OCR: npm install tesseract.js
  *
- * @param buffer - Image file buffer
- * @param ext    - File extension
- * @param ocr    - OCR option (opt-in, default off)
+ * @param buffer   - Image file buffer
+ * @param ext      - File extension
+ * @param ocr      - OCR option (opt-in, default off)
+ * @param fileName - Original file name from ConverterOptions, when provided
  */
 export async function convertImageToMarkdown(
   buffer: Buffer,
   ext: string,
-  ocr?: boolean | OCROptions
+  ocr?: boolean | OCROptions,
+  fileName?: string
 ): Promise<string> {
   try {
     const dimensions = sizeOf(buffer);
@@ -34,7 +60,13 @@ export async function convertImageToMarkdown(
       try {
         const { ocrImage } = await import('../utils/ocr.js');
         const ocrOpts: OCROptions = typeof ocr === 'object' ? ocr : {};
-        const text = await ocrImage(buffer, ocrOpts);
+        const text = await ocrImage(buffer, ocrOpts, {
+          mimeType: imageMimeType(ext, fileName, dimensions.type),
+          sourceExtension: ext,
+          fileName,
+          imageWidth: dimensions.width,
+          imageHeight: dimensions.height,
+        });
         if (text) md += `\n\n## Extracted Text\n\n${text}\n`;
       } catch (ocrErr: any) {
         md += `\n\n<!-- OCR failed: ${ocrErr.message} -->\n`;

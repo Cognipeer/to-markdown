@@ -1,4 +1,4 @@
-import type { OCROptions, VLMOptions } from '../types/index.js';
+import type { OCRHandlerContext, OCROptions, VLMOptions } from '../types/index.js';
 
 const DEFAULT_OCR_PROMPT =
   'Extract all text from this image exactly as it appears. Return only the extracted text, preserving the original layout and line breaks as closely as possible.';
@@ -6,12 +6,14 @@ const DEFAULT_OCR_PROMPT =
 /**
  * Extracts text from an image buffer using the configured OCR provider.
  *
- * @param buffer - Image buffer (PNG, JPEG, etc.)
- * @param opts   - OCR options including provider selection and provider-specific config
+ * @param buffer  - Image buffer (PNG, JPEG, etc.)
+ * @param opts    - OCR options including provider selection and provider-specific config
+ * @param context - Metadata forwarded to handler provider
  */
 export async function ocrImage(
   buffer: Buffer,
-  opts: OCROptions = {}
+  opts: OCROptions = {},
+  context: OCRHandlerContext = {}
 ): Promise<string> {
   const provider = opts.provider ?? 'tesseract';
 
@@ -28,6 +30,8 @@ export async function ocrImage(
       return ocrWithAzureVision(buffer, requireVlm(opts, 'azure-vision'));
     case 'custom-vlm':
       return ocrWithOpenAI(buffer, requireVlm(opts, 'custom-vlm'));
+    case 'handler':
+      return ocrWithHandler(buffer, opts, context);
     default: {
       // Exhaustiveness check — TypeScript will catch unknown providers at compile time
       const _never: never = provider;
@@ -37,6 +41,18 @@ export async function ocrImage(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+async function ocrWithHandler(
+  buffer: Buffer,
+  opts: OCROptions,
+  context: OCRHandlerContext
+): Promise<string> {
+  if (!opts.handler) {
+    throw new Error("OCR provider 'handler' requires opts.handler");
+  }
+  const text = await opts.handler(buffer, context);
+  return (text ?? '').trim();
+}
 
 function requireVlm(opts: OCROptions, provider: string): VLMOptions {
   if (!opts.vlm) {
