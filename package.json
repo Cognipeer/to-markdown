@@ -53,7 +53,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Cognipeer/to-markdown.git"
+    "url": "git+https://github.com/Cognipeer/to-markdown.git"
   },
   "bugs": {
     "url": "https://github.com/Cognipeer/to-markdown/issues"
