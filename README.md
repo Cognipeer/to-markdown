@@ -133,7 +133,7 @@ Built with these amazing libraries:
 
 ## 🔗 Links
 
-- [Documentation](https://cognipeer.github.io/to-markdown/)
+- [Documentation](https://docs.cognipeer.com/to-markdown/)
 - [npm Package](https://www.npmjs.com/package/@cognipeer/to-markdown)
 - [GitHub Repository](https://github.com/Cognipeer/to-markdown)
 - [Issue Tracker](https://github.com/Cognipeer/to-markdown/issues)
@@ -281,12 +281,12 @@ console.log(`Saved to: ${filePath}`);
 
 ## 📚 Documentation
 
-For comprehensive documentation, please visit our [documentation site](https://cognipeer.github.io/to-markdown/).
+For comprehensive documentation, please visit our [documentation site](https://docs.cognipeer.com/to-markdown/).
 
-- [Getting Started Guide](https://cognipeer.github.io/to-markdown/getting-started)
-- [API Documentation](https://cognipeer.github.io/to-markdown/api/overview)
-- [Format Support](https://cognipeer.github.io/to-markdown/guides/formats)
-- [Error Handling](https://cognipeer.github.io/to-markdown/guides/error-handling)
+- [Getting Started Guide](https://docs.cognipeer.com/to-markdown/getting-started)
+- [API Documentation](https://docs.cognipeer.com/to-markdown/api/overview)
+- [Format Support](https://docs.cognipeer.com/to-markdown/guides/formats)
+- [Error Handling](https://docs.cognipeer.com/to-markdown/guides/error-handling)
 
 ## 💡 Examples
 
