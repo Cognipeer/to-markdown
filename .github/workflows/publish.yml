@@ -1,24 +1,36 @@
 name: Publish to npm
 
 on:
-  create:
+  release:
+    types: [published]
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing vX.Y.Z tag to publish"
+        required: true
+        type: string
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: npm-publish-${{ github.event.ref }}
+  group: npm-publish-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.event.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) ||
+      (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag, 'v'))
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -32,7 +44,7 @@ jobs:
 
       - name: Verify tag matches package version
         env:
-          TAG_NAME: ${{ github.event.ref }}
+          TAG_NAME: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           TAG_VERSION="${TAG_NAME#v}"
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
