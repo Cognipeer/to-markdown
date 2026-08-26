@@ -12,6 +12,11 @@ export async function renderPdfPageToPng(
   pageNum: number = 1,
   scale: number = 2.0
 ): Promise<Buffer> {
+  const header = buffer.subarray(0, Math.min(buffer.length, 1024)).toString('latin1');
+  if (!header.includes('%PDF-')) {
+    throw new Error('Invalid PDF buffer: missing PDF header');
+  }
+
   // unpdf ships its own bundled pdfjs — not affected by host's pdfjs-dist version
   const { renderPageAsImage } = await import('unpdf');
 
