@@ -40,7 +40,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
+        if: github.event_name == 'release'
         run: npm ci
+
+      - name: Install dependencies for manual recovery
+        if: github.event_name == 'workflow_dispatch'
+        run: npm install --no-package-lock
 
       - name: Verify tag matches package version
         env:
