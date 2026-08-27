@@ -103,9 +103,15 @@ export function htmlToMarkdown(htmlString: string): string {
       }
 
       // Cell text may contain newlines/indentation from the source HTML —
-      // collapse it so a multi-line cell can't break the row line.
+      // collapse it so a multi-line cell can't break the row line. Escape
+      // backslashes *before* pipes so a literal `\` preceding a `|` can't
+      // combine with the inserted escape and leave the pipe unescaped.
       const cellText = (cell: any) =>
-        cell.textContent.replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+        cell.textContent
+          .replace(/\s+/g, ' ')
+          .trim()
+          .replace(/\\/g, '\\\\')
+          .replace(/\|/g, '\\|');
 
       const firstRowCells = trs[0].querySelectorAll('th,td');
       const headers = Array.from(firstRowCells).map(cellText);
