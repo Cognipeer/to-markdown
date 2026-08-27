@@ -35,12 +35,12 @@ export function formatMarkdown(text: string): string {
     // Fenced code: verbatim passthrough, indentation preserved.
     if (/^\s*(```|~~~)/.test(rawLine)) {
       inFence = !inFence;
-      out.push(rawLine.replace(/\s+$/, ''));
+      out.push(rawLine.trimEnd());
       mergeTarget = -1;
       continue;
     }
     if (inFence) {
-      out.push(rawLine.replace(/\s+$/, ''));
+      out.push(rawLine.trimEnd());
       continue;
     }
 
