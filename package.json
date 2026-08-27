@@ -1,6 +1,6 @@
 {
   "name": "@cognipeer/to-markdown",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "description": "A versatile utility library for converting various file formats to Markdown. Now with TypeScript support!",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
