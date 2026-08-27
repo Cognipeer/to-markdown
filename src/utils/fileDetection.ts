@@ -1,4 +1,4 @@
-import { fromBuffer } from 'file-type';
+import { fileTypeFromBuffer } from 'file-type';
 import { extension, lookup } from 'mime-types';
 import { existsSync, readFileSync } from 'fs';
 import { extname } from 'path';
@@ -31,7 +31,7 @@ export async function detectFileType(
         ext = mimeType ? '.' + extension(mimeType) : null;
 
         if (!ext) {
-          const fType = await fromBuffer(fileBuffer);
+          const fType = await fileTypeFromBuffer(fileBuffer);
           if (fType) {
             ext = '.' + fType.ext;
           }
@@ -51,7 +51,7 @@ export async function detectFileType(
         : extname(input).toLowerCase();
 
       if (!ext || ext === '') {
-        const fType = await fromBuffer(fileBuffer);
+        const fType = await fileTypeFromBuffer(fileBuffer);
         if (fType) {
           ext = '.' + fType.ext;
         } else {
@@ -64,7 +64,7 @@ export async function detectFileType(
     ext = options.forceExtension ? options.forceExtension.toLowerCase() : null;
 
     if (!ext || ext === '') {
-      const fType = await fromBuffer(fileBuffer);
+      const fType = await fileTypeFromBuffer(fileBuffer);
       if (fType) {
         ext = '.' + fType.ext;
       } else {

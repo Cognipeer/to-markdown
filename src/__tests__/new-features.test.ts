@@ -617,6 +617,25 @@ describe("renderPdfPageToPng()", () => {
       expect(err.message).toMatch(/Invalid PDF|npm install/i);
     }
   });
+
+  // Exercises the real unpdf + canvas rendering path (no mocks). Guards against
+  // silent breakage of the canvas integration across unpdf upgrades — a mocked
+  // test cannot catch an incompatible canvas backend or a renamed render option.
+  it("renders a real PDF page to an actual PNG buffer", async () => {
+    const onePagePdf = Buffer.from(
+      "%PDF-1.0\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+        "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+        "3 0 obj<</Type/Page/MediaBox[0 0 99 99]/Parent 2 0 R>>endobj\n" +
+        "trailer<</Size 4/Root 1 0 R>>\n%%EOF",
+    );
+
+    const png = await renderPdfPageToPng(onePagePdf, 1, 2);
+
+    expect(Buffer.isBuffer(png)).toBe(true);
+    expect(png.length).toBeGreaterThan(0);
+    // PNG magic number: \x89 P N G
+    expect(png.subarray(0, 4)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────

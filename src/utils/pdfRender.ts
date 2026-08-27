@@ -4,8 +4,8 @@
  * Uses unpdf (bundled dependency) so it is not affected by the host
  * application's pdfjs-dist version.
  *
- * Requires optional peer dependency for Node.js canvas rendering:
- *   npm install canvas   (or)   npm install @napi-rs/canvas
+ * Requires a Node.js canvas implementation. unpdf renders through
+ * `@napi-rs/canvas`, which is shipped as a dependency of this package.
  */
 export async function renderPdfPageToPng(
   buffer: Buffer,
@@ -20,29 +20,23 @@ export async function renderPdfPageToPng(
   // unpdf ships its own bundled pdfjs — not affected by host's pdfjs-dist version
   const { renderPageAsImage } = await import('unpdf');
 
-  // Resolve canvas implementation: prefer `canvas`, fall back to `@napi-rs/canvas`
-  let canvasImport: (() => Promise<any>) | undefined;
+  // unpdf's Node canvas factory is built against `@napi-rs/canvas`: it calls
+  // `canvas.encode('png')`, which the legacy `canvas` package does not provide.
+  let canvasImport: () => Promise<any>;
   try {
-    await import('canvas');
-    canvasImport = () => import('canvas');
+    await import('@napi-rs/canvas');
+    canvasImport = () => import('@napi-rs/canvas');
   } catch {
-    try {
-      // @ts-ignore — optional peer dependency
-      await import('@napi-rs/canvas');
-      // @ts-ignore — optional peer dependency
-      canvasImport = () => import('@napi-rs/canvas');
-    } catch {
-      throw new Error(
-        'PDF rendering requires a canvas library: npm install canvas'
-      );
-    }
+    throw new Error(
+      'PDF rendering requires a canvas library: npm install @napi-rs/canvas'
+    );
   }
 
   // renderPageAsImage returns ArrayBuffer; convert to Buffer for Node.js consumers
   const result = await renderPageAsImage(
     new Uint8Array(buffer),
     pageNum,
-    { canvas: canvasImport, scale }
+    { canvasImport, scale }
   );
 
   return Buffer.from(result);

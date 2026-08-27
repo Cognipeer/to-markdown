@@ -13,7 +13,6 @@ const external = [
   "tesseract.js",
   "pdfjs-dist",
   "@napi-rs/canvas",
-  "canvas",
   "gpt-tokenizer",
   "fs", "path", "node:fs", "node:path", "node:crypto", "node:stream",
   "node:buffer", "node:util", "node:events", "node:os", "node:url",

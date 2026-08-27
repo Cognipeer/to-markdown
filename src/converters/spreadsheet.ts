@@ -1,27 +1,109 @@
-import { read, utils } from 'xlsx';
-import { parse } from 'papaparse';
+import ExcelJS from 'exceljs';
+import { readXls, CellError } from 'xls-reader';
+// papaparse is CJS-only and its named exports are not statically detectable by
+// Node's cjs-module-lexer, so a named ESM import throws at runtime. Use the
+// default import, which always works for CJS interop.
+import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import { formatMarkdown, arrayToMarkdownTable } from '../utils/markdown.js';
 
+/** OLE2 / Compound File Binary signature — legacy `.xls` (BIFF8, Excel 97-2003). */
+const OLE2_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+
+interface SheetData {
+  name: string;
+  rows: unknown[][];
+}
+
 /**
- * Converts Excel buffer to Markdown
+ * Renders a single spreadsheet cell as table text.
+ *
+ * Handles the value shapes ExcelJS can produce (rich text, formula results,
+ * hyperlinks, error cells) as well as the primitives returned by xls-reader.
+ */
+function formatCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof CellError) return value.toString();
+
+  if (typeof value === 'object') {
+    const cell = value as Record<string, any>;
+    // ExcelJS rich text
+    if (Array.isArray(cell.richText)) {
+      return cell.richText.map((part: any) => part?.text ?? '').join('');
+    }
+    // ExcelJS formula cell — prefer the cached result over the expression
+    if ('result' in cell) return formatCell(cell.result);
+    if ('formula' in cell) return '';
+    // ExcelJS hyperlink
+    if ('hyperlink' in cell) return String(cell.text ?? cell.hyperlink ?? '');
+    // ExcelJS error cell
+    if ('error' in cell) return String(cell.error);
+    if ('text' in cell) return String(cell.text);
+  }
+
+  return String(value);
+}
+
+/** Normalizes ragged rows into a rectangular grid so the Markdown table stays well-formed. */
+function toGrid(rows: unknown[][]): string[][] {
+  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  return rows.map((row) => {
+    const cells = row.map(formatCell);
+    while (cells.length < width) cells.push('');
+    return cells;
+  });
+}
+
+/** Reads a legacy `.xls` (BIFF8) workbook via xls-reader. */
+function readLegacyXls(buffer: Buffer): SheetData[] {
+  return readXls(buffer).sheets.map((sheet) => ({
+    name: sheet.name,
+    rows: sheet.rows.map((row) => [...row]),
+  }));
+}
+
+/** Reads an OOXML `.xlsx` workbook via ExcelJS. */
+async function readOoxml(buffer: Buffer): Promise<SheetData[]> {
+  const wb = new ExcelJS.Workbook();
+  // ExcelJS types the loader against the DOM ArrayBuffer; a Node Buffer works at runtime.
+  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+
+  return wb.worksheets.map((ws) => {
+    const rows: unknown[][] = [];
+    ws.eachRow({ includeEmpty: true }, (row) => {
+      // `row.values` is 1-based, so index 0 is always empty padding.
+      const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+      rows.push(Array.from(values));
+    });
+    return { name: ws.name, rows };
+  });
+}
+
+/**
+ * Converts an Excel buffer to Markdown.
+ *
+ * Supports both OOXML (`.xlsx`, via ExcelJS) and legacy BIFF8 (`.xls`, via
+ * xls-reader). The format is detected from the buffer signature rather than the
+ * file extension, so mislabelled files are still handled correctly.
+ *
  * @param buffer - Excel file buffer
  * @returns Markdown string
  */
 export async function convertExcelToMarkdown(buffer: Buffer): Promise<string> {
   try {
-    const wb = read(buffer, { type: 'buffer' });
+    const isLegacyXls =
+      buffer.length >= OLE2_SIGNATURE.length &&
+      buffer.subarray(0, OLE2_SIGNATURE.length).equals(OLE2_SIGNATURE);
+
+    const sheets = isLegacyXls ? readLegacyXls(buffer) : await readOoxml(buffer);
 
     let md = '';
 
-    wb.SheetNames.forEach((sheetName) => {
-      md += `## ${sheetName}\n\n`;
-
-      const ws = wb.Sheets[sheetName];
-      const json = utils.sheet_to_json(ws, { header: 1 });
-
-      md += arrayToMarkdownTable(json as any[][]) + '\n\n';
-    });
+    for (const sheet of sheets) {
+      md += `## ${sheet.name}\n\n`;
+      md += arrayToMarkdownTable(toGrid(sheet.rows)) + '\n\n';
+    }
 
     return formatMarkdown(md);
   } catch (err: any) {
@@ -96,7 +178,7 @@ function decodeBuffer(buffer: Buffer): string {
 export function convertCsvToMarkdown(buffer: Buffer): string {
   try {
     const text = decodeBuffer(buffer);
-    const result = parse(text, { delimiter: ',', skipEmptyLines: true });
+    const result = Papa.parse(text, { delimiter: ',', skipEmptyLines: true });
     const data = result.data as any[][];
 
     return formatMarkdown(arrayToMarkdownTable(data));

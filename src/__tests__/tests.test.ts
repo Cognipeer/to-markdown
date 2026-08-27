@@ -4,7 +4,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { beforeAll, describe, expect, it } from "vitest";
-import { utils as xlsxUtils, write as xlsxWrite } from "xlsx";
+import ExcelJS from "exceljs";
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 import { detectFileType } from "../utils/fileDetection.ts";
@@ -653,17 +653,29 @@ describe("detectFileType()", () => {
 describe("convertExcelToMarkdown()", () => {
   let excelBuffer: Buffer;
 
-  beforeAll(() => {
-    const wb = xlsxUtils.book_new();
-    const ws = xlsxUtils.aoa_to_sheet([
-      ["Name", "Surname", "Age"],
-      ["John", "Doe", 25],
-      ["Jane", "Smith", 30],
+  /** Builds an .xlsx buffer from an array-of-arrays via ExcelJS. */
+  async function buildXlsx(
+    sheets: Array<{ name: string; rows: unknown[][] }>,
+  ): Promise<Buffer> {
+    const wb = new ExcelJS.Workbook();
+    for (const { name, rows } of sheets) {
+      const ws = wb.addWorksheet(name);
+      rows.forEach((row) => ws.addRow(row as any[]));
+    }
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  beforeAll(async () => {
+    excelBuffer = await buildXlsx([
+      {
+        name: "Employees",
+        rows: [
+          ["Name", "Surname", "Age"],
+          ["John", "Doe", 25],
+          ["Jane", "Smith", 30],
+        ],
+      },
     ]);
-    xlsxUtils.book_append_sheet(wb, ws, "Employees");
-    excelBuffer = Buffer.from(
-      xlsxWrite(wb, { type: "buffer", bookType: "xlsx" }),
-    );
   });
 
   it("adds sheet name as heading", async () => {
@@ -690,31 +702,31 @@ describe("convertExcelToMarkdown()", () => {
   });
 
   it("supports multiple sheets", async () => {
-    const wb2 = xlsxUtils.book_new();
-    xlsxUtils.book_append_sheet(
-      wb2,
-      xlsxUtils.aoa_to_sheet([["X"], [1]]),
-      "Sheet1",
-    );
-    xlsxUtils.book_append_sheet(
-      wb2,
-      xlsxUtils.aoa_to_sheet([["Y"], [2]]),
-      "Sheet2",
-    );
-    const buf = Buffer.from(
-      xlsxWrite(wb2, { type: "buffer", bookType: "xlsx" }),
-    );
+    const buf = await buildXlsx([
+      { name: "Sheet1", rows: [["X"], [1]] },
+      { name: "Sheet2", rows: [["Y"], [2]] },
+    ]);
     const result = await convertExcelToMarkdown(buf);
     expect(result).toContain("Sheet1");
     expect(result).toContain("Sheet2");
   });
 
-  it("parses invalid buffer without error (xlsx is tolerant)", async () => {
-    // xlsx library processes invalid data as an empty sheet named "Sheet1", does not throw
-    const result = await convertExcelToMarkdown(
-      Buffer.from("not an excel file"),
-    );
-    expect(typeof result).toBe("string"); // does not crash
+  it("pads ragged rows so the table stays rectangular", async () => {
+    const buf = await buildXlsx([
+      { name: "Ragged", rows: [["A", "B", "C"], ["only-one"]] },
+    ]);
+    const result = await convertExcelToMarkdown(buf);
+    const dataRow = result
+      .split("\n")
+      .find((line) => line.includes("only-one"))!;
+    // 3 columns => 4 pipes
+    expect(dataRow.split("|").length - 1).toBe(4);
+  });
+
+  it("throws a clear error for a buffer that is not a spreadsheet", async () => {
+    await expect(
+      convertExcelToMarkdown(Buffer.from("not an excel file")),
+    ).rejects.toThrow(/Failed to convert Excel/);
   });
 
   it("convertToMarkdown handles .xlsx format", async () => {

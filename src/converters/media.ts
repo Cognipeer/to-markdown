@@ -1,4 +1,4 @@
-import { imageSize as sizeOf } from 'image-size';
+import { imageDimensionsFromData } from 'image-dimensions';
 import { lookup } from 'mime-types';
 import { parseBuffer } from 'music-metadata';
 import { formatMarkdown } from '../utils/markdown.js';
@@ -43,7 +43,18 @@ export async function convertImageToMarkdown(
   fileName?: string
 ): Promise<string> {
   try {
-    const dimensions = sizeOf(buffer);
+    const measured = imageDimensionsFromData(buffer);
+    if (!measured) {
+      throw new Error('unsupported or invalid image data');
+    }
+
+    // `image-dimensions` reports JPEG as `jpeg`; the rest of this package (and
+    // its Markdown output) uses the `jpg` spelling.
+    const dimensions = {
+      width: measured.width,
+      height: measured.height,
+      type: measured.type === 'jpeg' ? 'jpg' : measured.type,
+    };
 
     let md = '';
 

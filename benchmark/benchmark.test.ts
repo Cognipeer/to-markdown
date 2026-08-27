@@ -38,6 +38,13 @@ describe('MarkItDown Benchmark — @cognipeer/to-markdown', () => {
     expect(out).toContain('6ff4173b');
   });
 
+  it('test.xls — format is detected from the buffer signature, not the extension', async () => {
+    // A real BIFF8 file announced as .xlsx must still route to the legacy reader.
+    const out = await convertToMarkdown(buf('test.xls'), { forceExtension: '.xlsx' });
+    expect(out).toContain('09060124');
+    expect(out).toContain('6ff4173b');
+  });
+
   it('test.pptx — PowerPoint extracts slide content', async () => {
     const out = await convertToMarkdown(buf('test.pptx'), { forceExtension: '.pptx' });
     expect(out).toContain('2cdda5c8');
