@@ -18,6 +18,29 @@ import { convertEpubToMarkdown } from './converters/epub.js';
 import { convertMsgToMarkdown } from './converters/msg.js';
 
 /**
+ * Parses a URL's host/path without throwing on malformed input.
+ * Returns `null` when `rawUrl` is not a valid absolute URL.
+ */
+function parseUrlParts(rawUrl: string): { hostname: string; pathname: string } | null {
+  try {
+    const { hostname, pathname } = new URL(rawUrl);
+    return { hostname, pathname };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when `hostname` is exactly `domain` or a subdomain of it. Unlike a
+ * plain substring check, this can't be tricked by hosts/paths that merely
+ * contain `domain` as text (e.g. `evil.com/youtube.com` or
+ * `youtube.com.evil.com`).
+ */
+function isHostOrSubdomain(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
+
+/**
  * Main function to convert various file formats to Markdown.
  *
  * @param input   - File path (string), base64 data URL (string), or Buffer
@@ -101,13 +124,19 @@ export async function convertToMarkdown(
     case '.msg':
       return convertMsgToMarkdown(buffer);
 
-    default:
-      if (options.url && options.url.includes('youtube.com')) {
-        return convertYoutubeToMarkdown(buffer, options.url);
+    default: {
+      const urlParts = options.url ? parseUrlParts(options.url) : null;
+      if (urlParts && isHostOrSubdomain(urlParts.hostname, 'youtube.com')) {
+        return convertYoutubeToMarkdown(buffer, options.url!);
       }
-      if (options.url && options.url.includes('bing.com/search')) {
-        return convertBingSerpToMarkdown(buffer, options.url);
+      if (
+        urlParts &&
+        isHostOrSubdomain(urlParts.hostname, 'bing.com') &&
+        urlParts.pathname.startsWith('/search')
+      ) {
+        return convertBingSerpToMarkdown(buffer, options.url!);
       }
       return convertTextFileToMarkdown(buffer);
+    }
   }
 }
