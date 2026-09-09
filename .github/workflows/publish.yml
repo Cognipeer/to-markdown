@@ -24,7 +24,7 @@ jobs:
     if: >-
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) ||
       (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag, 'v'))
-    runs-on: ubuntu-latest
+    runs-on: cognipeer-azure-runners
 
     steps:
       - name: Checkout
