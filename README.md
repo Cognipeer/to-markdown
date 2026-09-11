@@ -73,7 +73,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### Unreleased
+### Version 3.4.1 (Latest)
 
 - Added bounded binary Word 97-2003 `.doc` to Markdown conversion with body,
   header, and footnote story preservation, typed errors, and CommonMark list
