@@ -17,6 +17,7 @@ interface ConverterOptions {
   forceExtension?: string;
   url?: string;
   ocr?: boolean | OCROptions;
+  doc?: DocOptions;
 }
 ```
 
@@ -52,6 +53,7 @@ const markdown = await convertToMarkdown(buffer, {
 
 **Supported Extensions:**
 - `.pdf` - PDF documents
+- `.doc` - Binary Word 97-2003 documents
 - `.docx` - Word documents
 - `.html`, `.htm` - HTML files
 - `.xlsx`, `.xls` - Excel spreadsheets
@@ -103,6 +105,38 @@ const markdown = await convertToMarkdown("scan.pdf", {
 ```
 
 See [Type Definitions]({{ site.baseurl }}{% link api/types.md %}) for `OCROptions`, `OCRHandler`, and `OCRHandlerContext`.
+
+---
+
+### doc
+
+- **Type:** `DocOptions` (optional)
+- **Description:** Configures binary Word 97-2003 (`.doc`) conversion.
+
+The default output contains body text plus non-empty headers and footnotes. For
+Buffer or plain-base64 DOC input, set `fileName` or `forceExtension: '.doc'` so
+the converter can distinguish the shared Compound File container from other
+legacy Office formats.
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `includeHeaders` | `boolean` | `true` | Include non-empty headers under `## Document headers`. |
+| `includeFootnotes` | `boolean` | `true` | Include non-empty footnotes under `## Footnotes`. |
+| `maxInputBytes` | `number` | 25 MiB | DOC byte limit; maximum 50 MiB. Applies before configured base64 DOC input is decoded. |
+| `maxOutputChars` | `number` | 2,000,000 | Markdown character limit; maximum 4,000,000. |
+
+```typescript
+const markdown = await convertToMarkdown(docBase64, {
+  fileName: 'policy.doc',
+  doc: {
+    includeFootnotes: false,
+    maxInputBytes: 10 * 1024 * 1024,
+  },
+});
+```
+
+See [Error Handling]({{ site.baseurl }}{% link guides/error-handling.md %}) for
+controlled DOC conversion errors.
 
 ## Usage Examples
 

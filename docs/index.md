@@ -20,7 +20,7 @@ A versatile utility library for converting various file formats to Markdown.
 
 ## Features
 
-- 🎯 **Multiple Format Support**: Convert PDF, DOCX, HTML, Excel, CSV, and more
+- 🎯 **Multiple Format Support**: Convert PDF, DOC, DOCX, HTML, Excel, CSV, and more
 - 📦 **Simple API**: Easy to use with Promise-based interface
 - 🔧 **TypeScript**: Full TypeScript support with type definitions
 - 🚀 **Fast & Efficient**: Optimized for performance
@@ -31,6 +31,7 @@ A versatile utility library for converting various file formats to Markdown.
 | Format | Extensions | Description |
 |--------|-----------|-------------|
 | PDF | `.pdf` | PDF documents |
+| Word | `.doc` | Word 97-2003 documents with text, lists, headers, and footnotes |
 | Word | `.docx` | Microsoft Word documents |
 | HTML | `.html`, `.htm` | HTML web pages |
 | Excel | `.xlsx`, `.xls` | Excel spreadsheets |

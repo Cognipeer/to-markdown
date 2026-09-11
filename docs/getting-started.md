@@ -82,6 +82,22 @@ const markdown2 = await convertToMarkdown(plainBase64, {
 });
 ```
 
+### Converting a Legacy Word DOC
+
+```typescript
+const docBuffer = readFileSync('./policy.doc');
+const markdown = await convertToMarkdown(docBuffer, {
+  fileName: 'policy.doc',
+  doc: {
+    includeFootnotes: false,
+  },
+});
+```
+
+Binary Word `.doc` conversion includes non-empty headers and footnotes by
+default. Use `includeHeaders: false` or `includeFootnotes: false` only when a
+caller intentionally needs to omit those stories.
+
 ## Saving Output
 
 Use the `saveToMarkdownFile` function to save converted markdown to a file:

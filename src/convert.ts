@@ -1,6 +1,7 @@
 import type { ConverterInput, ConverterOptions } from './types/index.js';
 import { detectFileType } from './utils/fileDetection.js';
 import { convertPdfToMarkdown } from './converters/pdf.js';
+import { convertDocToMarkdown } from './converters/doc.js';
 import { convertDocxToMarkdown } from './converters/docx.js';
 import { convertHtmlToMarkdown } from './converters/html.js';
 import {
@@ -69,6 +70,9 @@ export async function convertToMarkdown(
   switch (ext) {
     case '.pdf':
       return await convertPdfToMarkdown(buffer, options.ocr, options.fileName);
+
+    case '.doc':
+      return await convertDocToMarkdown(buffer, options.doc);
 
     case '.docx':
       return await convertDocxToMarkdown(buffer);

@@ -79,6 +79,7 @@ interface ConverterOptions {
   fileName?: string;        // File name for buffer inputs
   forceExtension?: string;  // Force specific file extension
   url?: string;            // Original URL (for web content)
+  doc?: DocOptions;        // Binary Word DOC conversion options
 }
 ```
 
@@ -89,6 +90,7 @@ Enum of supported file extensions:
 ```typescript
 enum FileExtension {
   PDF = '.pdf',
+  DOC = '.doc',
   DOCX = '.docx',
   HTML = '.html',
   // ... and more

@@ -1,8 +1,34 @@
 import { fileTypeFromBuffer } from 'file-type';
 import { extension, lookup } from 'mime-types';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { extname } from 'path';
 import type { ConverterInput, ConverterOptions, FileTypeResult } from '../types/index.js';
+import { DocConversionError } from '../converters/doc/errors.js';
+import { assertDocInputSize, resolveDocLimits } from '../converters/doc/limits.js';
+
+const normalizeExtension = (value?: string): string | null => {
+  if (!value) return null;
+  const extensionValue = extname(value).toLowerCase();
+  return extensionValue || null;
+};
+
+const forcedExtension = (options: ConverterOptions): string | null => (
+  options.forceExtension?.toLowerCase() || null
+);
+
+const configuredExtension = (options: ConverterOptions): string | null => (
+  forcedExtension(options) || normalizeExtension(options.fileName)
+);
+
+const assertConfiguredDocInputSize = (
+  byteLength: number,
+  extensionValue: string | null,
+  options: ConverterOptions,
+): void => {
+  if (extensionValue === '.doc') {
+    assertDocInputSize(byteLength, resolveDocLimits(options.doc));
+  }
+};
 
 /**
  * Detects and returns file extension and buffer from various input types
@@ -22,13 +48,17 @@ export async function detectFileType(
     if (input.startsWith('data:') || /^[A-Za-z0-9+/]+={0,2}$/.test(input)) {
       try {
         const base64Data = input.split('base64,').pop() || input;
+
+        ext = forcedExtension(options);
+        if (!ext) {
+          const mimeType = input.startsWith('data:')
+            ? input.split(';')[0].split(':')[1]
+            : lookup(options.fileName || '');
+          ext = mimeType ? '.' + extension(mimeType) : normalizeExtension(options.fileName);
+        }
+
+        assertConfiguredDocInputSize(Buffer.byteLength(base64Data, 'base64'), ext, options);
         fileBuffer = Buffer.from(base64Data, 'base64');
-
-        const mimeType = input.startsWith('data:')
-          ? input.split(';')[0].split(':')[1]
-          : lookup(options.fileName || '');
-
-        ext = mimeType ? '.' + extension(mimeType) : null;
 
         if (!ext) {
           const fType = await fileTypeFromBuffer(fileBuffer);
@@ -36,8 +66,12 @@ export async function detectFileType(
             ext = '.' + fType.ext;
           }
         }
-      } catch (err: any) {
-        throw new Error(`Failed to convert base64: ${err.message}`);
+      } catch (err: unknown) {
+        if (err instanceof DocConversionError) {
+          throw err;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to convert base64: ${message}`);
       }
     } else {
       // Handle file path
@@ -45,10 +79,9 @@ export async function detectFileType(
         throw new Error('File not found: ' + input);
       }
 
+      ext = forcedExtension(options) || extname(input).toLowerCase();
+  assertConfiguredDocInputSize(statSync(input).size, ext, options);
       fileBuffer = readFileSync(input);
-      ext = options.forceExtension
-        ? options.forceExtension.toLowerCase()
-        : extname(input).toLowerCase();
 
       if (!ext || ext === '') {
         const fType = await fileTypeFromBuffer(fileBuffer);
@@ -61,7 +94,8 @@ export async function detectFileType(
     }
   } else if (Buffer.isBuffer(input)) {
     fileBuffer = input;
-    ext = options.forceExtension ? options.forceExtension.toLowerCase() : null;
+    ext = configuredExtension(options);
+    assertConfiguredDocInputSize(fileBuffer.length, ext, options);
 
     if (!ext || ext === '') {
       const fType = await fileTypeFromBuffer(fileBuffer);
@@ -78,6 +112,7 @@ export async function detectFileType(
   }
 
   if (!ext) ext = '.txt';
+  assertConfiguredDocInputSize(fileBuffer.length, ext, options);
 
   return { buffer: fileBuffer, extension: ext };
 }

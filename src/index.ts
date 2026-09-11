@@ -6,6 +6,8 @@ import type { BatchInput, BatchResult } from './types/index.js';
 // ── Re-exports ─────────────────────────────────────────────────────────────
 export { convertToMarkdown } from './convert.js';
 export { convertUrlToMarkdown } from './converters/url.js';
+export { DocConversionError } from './converters/doc/errors.js';
+export type { DocErrorCode } from './converters/doc/errors.js';
 
 // New AI/RAG API
 export { convertToRichMarkdown } from './rich.js';
