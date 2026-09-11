@@ -82,6 +82,13 @@ export interface OCROptions {
   handler?: OCRHandler;
 }
 
+export interface DocOptions {
+  includeHeaders?: boolean;
+  includeFootnotes?: boolean;
+  maxInputBytes?: number;
+  maxOutputChars?: number;
+}
+
 /**
  * Converter options for converting various file formats to Markdown
  */
@@ -94,6 +101,8 @@ export interface ConverterOptions {
   url?: string;
   /** Enable OCR for images and scanned PDFs (opt-in, requires tesseract.js) */
   ocr?: boolean | OCROptions;
+  /** Options for binary Word DOC conversion */
+  doc?: DocOptions;
 }
 
 /**
@@ -106,6 +115,7 @@ export type ConverterInput = string | Buffer;
  */
 export enum FileExtension {
   PDF = '.pdf',
+  DOC = '.doc',
   DOCX = '.docx',
   HTML = '.html',
   HTM = '.htm',

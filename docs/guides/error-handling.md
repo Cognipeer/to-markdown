@@ -53,6 +53,38 @@ try {
 }
 ```
 
+### Binary Word DOC Errors
+
+DOC conversion exposes a typed error contract for controlled failures.
+
+```typescript
+import {
+  convertToMarkdown,
+  DocConversionError,
+  type DocErrorCode,
+} from '@cognipeer/to-markdown';
+
+try {
+  await convertToMarkdown(docBuffer, {
+    fileName: 'policy.doc',
+  });
+} catch (error) {
+  if (error instanceof DocConversionError) {
+    const code: DocErrorCode = error.code;
+    console.error(code, error.message);
+  } else {
+    throw error;
+  }
+}
+```
+
+| Code | Meaning |
+| --- | --- |
+| `DOC_INVALID` | The Compound File or DOC data is malformed, truncated, or has no extractable selected story. |
+| `DOC_ENCRYPTED` | The file is encrypted or obfuscated. |
+| `DOC_LIMIT_EXCEEDED` | An input, output, directory, piece, or list safety limit was exceeded. |
+| `DOC_UNSUPPORTED` | The DOC uses a format outside the supported Word 97-2003 scope, such as Word 6/95. |
+
 ## Best Practices
 
 ### Always Use Try-Catch

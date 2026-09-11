@@ -8,7 +8,7 @@ A versatile, TypeScript-first utility library for converting various file format
 
 ## ✨ Features
 
-- 🎯 **Multiple Format Support**: Convert PDF, DOCX, HTML, Excel, CSV, and more
+- 🎯 **Multiple Format Support**: Convert PDF, DOC, DOCX, HTML, Excel, CSV, and more
 - 🔎 **OCR Support**: Extract text from scanned PDFs and images
 - 📦 **Simple API**: Easy to use with Promise-based interface
 - 🔧 **TypeScript First**: Written in TypeScript with full type definitions
@@ -73,7 +73,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### Version 3.2.0 (Latest)
+### Unreleased
+
+- Added bounded binary Word 97-2003 `.doc` to Markdown conversion with body,
+  header, and footnote story preservation, typed errors, and CommonMark list
+  normalization.
+
+### Version 3.2.0
 
 - 🧩 Added `'handler'` OCR provider — supply a custom async callback (with page/image context) and the library makes no HTTP requests of its own
 
@@ -194,6 +200,42 @@ const input: ConverterInput = "./document.pdf";
 const result: string = await convertToMarkdown(input, options);
 ```
 
+### Convert Binary Word DOC
+
+```typescript
+const markdown = await convertToMarkdown(docBuffer, {
+  fileName: "policy.doc",
+});
+```
+
+Binary Word `.doc` conversion supports Word 97-2003 documents. The default
+output contains body text and non-empty header stories as Markdown-compatible
+sections, including non-empty footnotes. Set `doc.includeHeaders` or
+`doc.includeFootnotes` to `false` to omit those stories. Tables remain
+tab-separated rows unless cell structure can be established without guesswork.
+`DocOptions` also provides per-call input and output limits.
+
+```typescript
+const markdown = await convertToMarkdown(docBase64, {
+  fileName: "policy.doc",
+  doc: {
+    maxInputBytes: 10 * 1024 * 1024,
+    maxOutputChars: 500_000,
+  },
+});
+```
+
+For Buffer or plain-base64 input, provide `fileName` or `forceExtension: ".doc"`.
+The Compound File signature is shared by some older Office formats, so an input
+name is required to choose the DOC converter unambiguously. DOC input is limited
+to 25 MiB by default and 50 MiB maximum; output is limited to 2,000,000
+characters by default and 4,000,000 maximum.
+
+The converter normalizes Word list metadata to CommonMark-compatible unordered
+and ordered lists. It does not extract images, OCR text, or embedded-object
+payloads, and it rejects encrypted, malformed, Word 6/95, and other unsupported
+legacy formats with `DocConversionError`.
+
 ## 📖 API Reference
 
 ### `convertToMarkdown(input, options?)`
@@ -208,6 +250,7 @@ Converts various file formats to Markdown.
   - `forceExtension?: string` - Force a specific file extension for processing
   - `url?: string` - Original URL (used for web content like YouTube or Bing search)
   - `ocr?: boolean | OCROptions` - Enable OCR for images and scanned PDFs (opt-in)
+  - `doc?: DocOptions` - Options for binary Word `.doc` conversion
 
 `OCROptions` includes:
 
@@ -216,6 +259,16 @@ Converts various file formats to Markdown.
 - `pdfMode?: 'auto' | 'always' | 'never'` - PDF OCR mode (default: `auto`)
 - `vlm?: { model: string; apiKey?: string; apiBase?: string; prompt?: string; maxTokens?: number }`
 - `handler?: (buffer, context) => Promise<string>` - Custom async OCR callback (required when `provider: 'handler'`; library makes no HTTP calls)
+
+`DocOptions` includes:
+
+- `includeHeaders?: boolean` - Include non-empty document headers (default: `true`)
+- `includeFootnotes?: boolean` - Include non-empty document footnotes (default: `true`)
+- `maxInputBytes?: number` - DOC input limit (default: 25 MiB; maximum: 50 MiB)
+- `maxOutputChars?: number` - Markdown output limit (default: 2,000,000; maximum: 4,000,000)
+
+DOC conversion failures are instances of `DocConversionError` with one of these
+codes: `DOC_INVALID`, `DOC_ENCRYPTED`, `DOC_LIMIT_EXCEEDED`, or `DOC_UNSUPPORTED`.
 
 **Returns:** `Promise<string>` - The converted markdown content
 

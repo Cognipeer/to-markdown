@@ -41,6 +41,31 @@ const markdown = await convertToMarkdown('./document.docx');
 
 ---
 
+### Legacy Word Documents (.doc)
+
+Converts Word 97-2003 binary DOC files to Markdown-compatible text.
+
+```typescript
+const markdown = await convertToMarkdown('./policy.doc');
+```
+
+**Features:**
+- Body text, paragraphs, and field results
+- Unordered and ordered Markdown lists
+- Non-empty headers and footnotes by default
+- Tab-separated table rows when cell structure cannot be verified
+- Bounded Compound File parsing and controlled errors for malformed input
+
+**Limits and scope:**
+- Default input limit: 25 MiB; maximum: 50 MiB
+- Default output limit: 2,000,000 characters; maximum: 4,000,000
+- Encrypted documents and Word 6/95 documents are rejected with typed errors
+- Images, OCR text, visual layout, and embedded-object payloads are not extracted
+
+Use `fileName` or `forceExtension: '.doc'` with Buffer or plain-base64 input.
+
+---
+
 ### HTML/HTM (.html, .htm)
 
 Converts HTML web pages to clean Markdown.

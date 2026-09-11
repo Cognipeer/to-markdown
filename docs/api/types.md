@@ -34,6 +34,8 @@ interface ConverterOptions {
   fileName?: string;
   forceExtension?: string;
   url?: string;
+  ocr?: boolean | OCROptions;
+  doc?: DocOptions;
 }
 ```
 
@@ -50,6 +52,7 @@ Enumeration of supported file extensions.
 ```typescript
 enum FileExtension {
   PDF = '.pdf',
+  DOC = '.doc',
   DOCX = '.docx',
   HTML = '.html',
   HTM = '.htm',
@@ -71,6 +74,42 @@ enum FileExtension {
   GIF = '.gif',
 }
 ```
+
+---
+
+### DocOptions
+
+Configuration for binary Word 97-2003 DOC conversion.
+
+```typescript
+interface DocOptions {
+  includeHeaders?: boolean;
+  includeFootnotes?: boolean;
+  maxInputBytes?: number;
+  maxOutputChars?: number;
+}
+```
+
+- `includeHeaders` defaults to `true`.
+- `includeFootnotes` defaults to `true`.
+- `maxInputBytes` defaults to 25 MiB and cannot exceed 50 MiB.
+- `maxOutputChars` defaults to 2,000,000 and cannot exceed 4,000,000.
+
+### DOC Conversion Errors
+
+```typescript
+type DocErrorCode =
+  | 'DOC_INVALID'
+  | 'DOC_ENCRYPTED'
+  | 'DOC_LIMIT_EXCEEDED'
+  | 'DOC_UNSUPPORTED';
+
+class DocConversionError extends Error {
+  readonly code: DocErrorCode;
+}
+```
+
+Both `DocConversionError` and `DocErrorCode` are exported from the package root.
 
 ---
 
