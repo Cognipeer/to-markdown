@@ -73,8 +73,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### Version 3.4.1 (Latest)
+### Version 3.4.2 (Latest)
 
+- Fixed npm Trusted Publishing provenance verification by running the publish
+  workflow on a GitHub-hosted runner.
 - Added bounded binary Word 97-2003 `.doc` to Markdown conversion with body,
   header, and footnote story preservation, typed errors, and CommonMark list
   normalization.
