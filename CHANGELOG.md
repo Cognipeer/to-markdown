@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-10-21
+
+### Fixed
+
+- PDF pages stored as CCITT G4 or JBIG2 images, which is how black-and-white
+  scanners save documents, rendered as blank pages, so OCR read nothing from
+  them. PDFs are now opened with pdfjs-dist, which loads the wasm image
+  decoders that unpdf's bundled pdf.js could not.
+
+### Added
+
+- `extractPdfPages(buffer)`: the text layer of each PDF page, without OCR. A
+  scanned page without a text layer comes back as an empty string.
+
+### Changed
+
+- `pdfjs-dist` is now a dependency.
+
 ## [3.4.2] - 2026-09-11
 
 ### Fixed

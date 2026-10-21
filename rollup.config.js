@@ -11,7 +11,8 @@ const external = [
   ...Object.keys(pkg.peerDependencies || {}),
   // optional peer deps (OCR / PDF rendering / tokenizer)
   "tesseract.js",
-  "pdfjs-dist",
+  // pdfjs-dist is imported by subpath (legacy/build/pdf.mjs); a plain string only matches the bare name.
+  /^pdfjs-dist(\/|$)/,
   "@napi-rs/canvas",
   "gpt-tokenizer",
   "fs", "path", "node:fs", "node:path", "node:crypto", "node:stream",
