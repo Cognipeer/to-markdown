@@ -1,4 +1,4 @@
-import { getDocumentProxy } from 'unpdf';
+import { loadPdf } from '../utils/pdfjs.js';
 import type { OCROptions } from '../types/index.js';
 
 // ── Constants (ported from MarkItDown _pdf_converter.py) ─────────────────
@@ -111,6 +111,21 @@ async function extractPagePlainText(page: any): Promise<string> {
     }
   }
   return text.trim();
+}
+
+/**
+ * Reads the text layer of each page, without OCR. A page without a text layer
+ * (a scanned page) comes back as an empty string.
+ */
+export async function extractPdfPages(buffer: Buffer): Promise<string[]> {
+  const pdf = await loadPdf(buffer);
+  const pages: string[] = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    pages.push(await extractPagePlainText(page));
+    page.cleanup();
+  }
+  return pages;
 }
 
 // ── Core form/table extractor (port of _extract_form_content_from_words) ─
@@ -297,7 +312,7 @@ export async function convertPdfToMarkdown(
   ocr?: boolean | OCROptions,
   fileName?: string
 ): Promise<string> {
-  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const pdf = await loadPdf(buffer);
 
   const markdownChunks: string[] = [];
   let formPageCount = 0;
@@ -356,7 +371,7 @@ export async function convertPdfToMarkdown(
       try {
         const { renderPdfPageToPng } = await import('../utils/pdfRender.js');
         const { ocrImage } = await import('../utils/ocr.js');
-        const pdf2 = await getDocumentProxy(new Uint8Array(buffer));
+        const pdf2 = await loadPdf(buffer);
         const ocrTexts: string[] = [];
         for (let p = 1; p <= pdf2.numPages; p++) {
           let png: Buffer;

@@ -23,6 +23,7 @@ export { extractSections, buildFrontmatter, emitFrontmatter } from './utils/meta
 export type { Section, Frontmatter } from './utils/metadata.js';
 
 export { ocrImage } from './utils/ocr.js';
+export { extractPdfPages } from './converters/pdf.js';
 export type { OCRProvider, VLMOptions } from './types/index.js';
 
 /**
