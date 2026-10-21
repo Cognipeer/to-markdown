@@ -13,7 +13,7 @@ import { definePDFJSModule, getDocumentProxy } from 'unpdf';
 
 const require = createRequire(import.meta.url);
 const pdfjsDir = dirname(require.resolve('pdfjs-dist/package.json'));
-const wasmUrl = join(pdfjsDir, 'wasm') + sep;
+const wasmUrl = join(pdfjsDir, 'wasm').split(sep).join('/') + '/';
 
 let configured: Promise<void> | null = null;
 
