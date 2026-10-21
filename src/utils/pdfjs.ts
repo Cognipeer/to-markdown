@@ -13,15 +13,22 @@ import { definePDFJSModule, getDocumentProxy } from 'unpdf';
 
 const require = createRequire(import.meta.url);
 const pdfjsDir = dirname(require.resolve('pdfjs-dist/package.json'));
-const wasmUrl = join(pdfjsDir, 'wasm').split(sep).join('/') + '/';
+// pdf.js rejects these locations unless they end in "/", also on Windows where
+// path.sep is "\"; Node reads Windows paths written with "/" as well.
+const pdfjsFolder = (name: string) => join(pdfjsDir, name).split(sep).join('/') + '/';
+const wasmUrl = pdfjsFolder('wasm');
+// Fonts a PDF uses without embedding them (Helvetica, Times, Courier). Without
+// pdf.js's own copies that text is drawn with the system's fonts, and a server
+// image that has none draws nothing.
+const standardFontDataUrl = pdfjsFolder('standard_fonts');
 
 let configured: Promise<void> | null = null;
 
-/** Opens a PDF with pdfjs-dist and its image decoders. */
+/** Opens a PDF with pdfjs-dist, its image decoders and its standard fonts. */
 export async function loadPdf(buffer: Uint8Array): ReturnType<typeof getDocumentProxy> {
   configured ??= definePDFJSModule(() => import('pdfjs-dist/legacy/build/pdf.mjs'));
   await configured;
-  return getDocumentProxy(new Uint8Array(buffer), { wasmUrl });
+  return getDocumentProxy(new Uint8Array(buffer), { wasmUrl, standardFontDataUrl });
 }
 
 /**
