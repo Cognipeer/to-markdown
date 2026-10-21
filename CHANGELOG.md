@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them. PDFs are now opened with pdfjs-dist, which loads the wasm image
   decoders that unpdf's bundled pdf.js could not.
 - Text in fonts a PDF uses without embedding them (Helvetica, Times, Courier)
-  was drawn with the system's fonts, so it rendered blank on servers without
-  any, such as slim Docker images. pdf.js now loads its own copies.
+  was drawn with the system's fonts (unpdf turns on `useSystemFonts`), so it
+  rendered blank on servers without any, such as slim Docker images. pdf.js
+  now uses its own copies of those fonts.
 
 ### Added
 

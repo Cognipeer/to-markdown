@@ -17,9 +17,9 @@ const pdfjsDir = dirname(require.resolve('pdfjs-dist/package.json'));
 // path.sep is "\"; Node reads Windows paths written with "/" as well.
 const pdfjsFolder = (name: string) => join(pdfjsDir, name).split(sep).join('/') + '/';
 const wasmUrl = pdfjsFolder('wasm');
-// Fonts a PDF uses without embedding them (Helvetica, Times, Courier). Without
-// pdf.js's own copies that text is drawn with the system's fonts, and a server
-// image that has none draws nothing.
+// pdf.js's own copies of the fonts a PDF may use without embedding them
+// (Helvetica, Times, Courier). unpdf sets this too, but resolves pdfjs-dist from
+// its own location, which can be another version than the one loaded here.
 const standardFontDataUrl = pdfjsFolder('standard_fonts');
 
 let configured: Promise<void> | null = null;
@@ -28,7 +28,14 @@ let configured: Promise<void> | null = null;
 export async function loadPdf(buffer: Uint8Array): ReturnType<typeof getDocumentProxy> {
   configured ??= definePDFJSModule(() => import('pdfjs-dist/legacy/build/pdf.mjs'));
   await configured;
-  return getDocumentProxy(new Uint8Array(buffer), { wasmUrl, standardFontDataUrl });
+  return getDocumentProxy(new Uint8Array(buffer), {
+    wasmUrl,
+    standardFontDataUrl,
+    // unpdf turns this on, and pdf.js then draws non-embedded fonts with the
+    // system's fonts instead of its own copies: a server without fonts (CI
+    // runners, slim Docker images) renders that text blank.
+    useSystemFonts: false,
+  });
 }
 
 /**
