@@ -1,10 +1,17 @@
 # @cognipeer/to-markdown
 
+**Convert PDF, Word, Excel, PowerPoint, HTML, EPUB, notebooks, images and more to clean Markdown, ready for LLM and RAG ingestion.**
+
 [![npm](https://img.shields.io/npm/v/@cognipeer/to-markdown?color=success)](https://npmjs.com/package/@cognipeer/to-markdown)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/npm/l/@cognipeer/to-markdown)](https://github.com/Cognipeer/to-markdown/blob/main/LICENSE)
+[![npm downloads](https://img.shields.io/npm/dm/@cognipeer/to-markdown)](https://www.npmjs.com/package/@cognipeer/to-markdown)
+[![License](https://img.shields.io/github/license/Cognipeer/to-markdown)](https://github.com/Cognipeer/to-markdown/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/Cognipeer/to-markdown?style=social)](https://github.com/Cognipeer/to-markdown)
+[![Docs](https://img.shields.io/badge/docs-docs.cognipeer.com-0A7CFF)](https://docs.cognipeer.com/to-markdown/)
 
-A versatile, TypeScript-first utility library for converting various file formats to Markdown.
+[Docs](https://docs.cognipeer.com/to-markdown/) · [Quick start](#-quick-start) · [Examples](./examples) · [Changelog](./CHANGELOG.md) · [Contact](mailto:developer@cognipeer.com)
+
+**Adoption:** in active use at more than 30 companies that Cognipeer supports as enterprise customers. Open-source users are not included in this count.
 
 ## ✨ Features
 
@@ -73,7 +80,17 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### Version 3.4.2 (Latest)
+Full history: [CHANGELOG.md](./CHANGELOG.md).
+
+### Version 3.5.0
+
+- Fixed scanned PDF pages stored as CCITT G4 or JBIG2 images coming out blank, so
+  OCR now reads them (PDFs are opened with pdfjs-dist and its image decoders).
+- Fixed blank text on servers without system fonts for PDFs that use
+  non-embedded standard fonts (Helvetica, Times, Courier).
+- Added `extractPdfPages(buffer)`: the text layer of each page, without OCR.
+
+### Version 3.4.2
 
 - Fixed npm Trusted Publishing provenance verification by running the publish
   workflow on a GitHub-hosted runner.
@@ -116,6 +133,22 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - Initial release with JavaScript implementation
 
 📖 See [CHANGELOG.md](./CHANGELOG.md) for the complete, detailed release history.
+
+## Cognipeer open-source projects
+
+| Project | What it does |
+| --- | --- |
+| [Cognipeer Console](https://github.com/Cognipeer/console) | Self-hosted AI gateway and control plane: OpenAI-compatible routing, RAG, MCP hub, guardrails and agent tracing |
+| [console-sdk](https://github.com/Cognipeer/console-sdk) | TypeScript SDK for the Cognipeer Console API |
+| [agent-sdk](https://github.com/Cognipeer/agent-sdk) | Lightweight, message-first agent runtime |
+| [agent-server](https://github.com/Cognipeer/agent-server) | Ready-made REST API layer for AI agents |
+| [chat-ui](https://github.com/Cognipeer/chat-ui) | React chat UI components for AI agents |
+| [graph-builder](https://github.com/Cognipeer/graph-builder) | Turn text sources into a queryable graph |
+| [cognipeer-observability](https://github.com/Cognipeer/cognipeer-observability) | Drop-in agent tracing for LangChain, LangGraph, OpenAI Agents and OpenTelemetry |
+
+If this project is useful to you, a ⭐ on GitHub helps other developers find it.
+
+Questions or enterprise support: [developer@cognipeer.com](mailto:developer@cognipeer.com).
 
 ## 📄 License
 
