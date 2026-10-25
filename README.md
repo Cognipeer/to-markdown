@@ -9,7 +9,9 @@
 [![GitHub stars](https://img.shields.io/github/stars/Cognipeer/to-markdown?style=social)](https://github.com/Cognipeer/to-markdown)
 [![Docs](https://img.shields.io/badge/docs-docs.cognipeer.com-0A7CFF)](https://docs.cognipeer.com/to-markdown/)
 
-[Docs](https://docs.cognipeer.com/to-markdown/) · [Quick start](#-quick-start) · [Examples](./examples) · [Changelog](./CHANGELOG.md)
+[Docs](https://docs.cognipeer.com/to-markdown/) · [Quick start](#-quick-start) · [Examples](./examples) · [Changelog](./CHANGELOG.md) · [Contact](mailto:developer@cognipeer.com)
+
+**Adoption:** in active use at more than 30 companies that Cognipeer supports as enterprise customers. Open-source users are not included in this count.
 
 ## ✨ Features
 
@@ -78,7 +80,17 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### Version 3.4.2 (Latest)
+Full history: [CHANGELOG.md](./CHANGELOG.md).
+
+### Version 3.5.0
+
+- Fixed scanned PDF pages stored as CCITT G4 or JBIG2 images coming out blank, so
+  OCR now reads them (PDFs are opened with pdfjs-dist and its image decoders).
+- Fixed blank text on servers without system fonts for PDFs that use
+  non-embedded standard fonts (Helvetica, Times, Courier).
+- Added `extractPdfPages(buffer)`: the text layer of each page, without OCR.
+
+### Version 3.4.2
 
 - Fixed npm Trusted Publishing provenance verification by running the publish
   workflow on a GitHub-hosted runner.
@@ -135,6 +147,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 | [cognipeer-observability](https://github.com/Cognipeer/cognipeer-observability) | Drop-in agent tracing for LangChain, LangGraph, OpenAI Agents and OpenTelemetry |
 
 If this project is useful to you, a ⭐ on GitHub helps other developers find it.
+
+Questions or enterprise support: [developer@cognipeer.com](mailto:developer@cognipeer.com).
 
 ## 📄 License
 
