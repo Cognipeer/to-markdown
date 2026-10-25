@@ -264,12 +264,14 @@ def render_html(blocks, lang, title):
 
 
 def write_pdf(html_path, pdf_path):
+    # Remove the committed file first so a failed Chrome run can never pass off a stale PDF as new.
+    Path(pdf_path).unlink(missing_ok=True)
     with tempfile.TemporaryDirectory() as prof:
         cmd = [CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
                f"--user-data-dir={prof}", f"--print-to-pdf={pdf_path}", f"file://{html_path}"]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-    if not Path(pdf_path).exists():
-        raise RuntimeError(f"Chrome did not produce {pdf_path}: {r.stderr[-500:]}")
+    if r.returncode != 0 or not Path(pdf_path).exists():
+        raise RuntimeError(f"Chrome did not produce {pdf_path} (exit {r.returncode}): {r.stderr[-500:]}")
 
 
 # -------------------------------------------------------------------- PPTX

@@ -238,6 +238,11 @@ def pct(x):
     return "n/a" if x is None else f"{x * 100:.1f}"
 
 
+def spread_pct(x):
+    """Run-to-run spread as a percentage; n/a when every run of the format failed."""
+    return "n/a" if x is None else f"{x * 100:.0f}%"
+
+
 def pair(pf, f, key, fmt=pct):
     a, b = pf[f]["to-markdown"][key], pf[f]["markitdown"][key]
     return f"{fmt(a)} / {fmt(b)}"
@@ -285,7 +290,7 @@ def render_md(s, fmts):
     for f in fmts:
         a, b = pf[f]["to-markdown"], pf[f]["markitdown"]
         L.append(f"| {f.upper()} | {pair(pf, f, 'median_ms', ms)} | {pair(pf, f, 'total_median_ms', ms)} | "
-                 f"{a['spread_median'] * 100:.0f}% / {b['spread_median'] * 100:.0f}% | {a['spread_max'] * 100:.0f}% / {b['spread_max'] * 100:.0f}% | "
+                 f"{spread_pct(a['spread_median'])} / {spread_pct(b['spread_median'])} | {spread_pct(a['spread_max'])} / {spread_pct(b['spread_max'])} | "
                  f"{a['failures']} / {b['failures']} |")
     if "markitdown_converter_only" in s:
         L += ["", "### MarkItDown converter-only (secondary)", "",

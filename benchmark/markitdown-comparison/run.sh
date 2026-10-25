@@ -12,8 +12,10 @@ ROOT="$(cd ../.. && pwd)"
 RUNS="${RUNS:-20}"
 START=$SECONDS
 
-# 1. Node side: install and build @cognipeer/to-markdown from this checkout
-if [ ! -f "$ROOT/dist/index.js" ]; then
+# 1. Node side: install and build @cognipeer/to-markdown from this checkout. Always rebuilt, so
+#    the measured dist/ matches the version and commit that collect_env.py records.
+#    SKIP_BUILD=1 reuses an existing build when iterating locally (not for reported runs).
+if [ "${SKIP_BUILD:-0}" != "1" ] || [ ! -f "$ROOT/dist/index.js" ]; then
   (cd "$ROOT" && npm ci --no-audit --no-fund && npm run build)
 fi
 

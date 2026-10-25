@@ -309,11 +309,13 @@ cd benchmark/markitdown-comparison
 ./run.sh                    # uses the committed corpus; about 80 s on the machine above (20 runs per file)
 REGENERATE=1 ./run.sh       # rebuild the corpus first (needs Google Chrome on macOS)
 RUNS=50 ./run.sh            # more timed runs per file
+SKIP_BUILD=1 ./run.sh       # reuse an existing dist/ (local iteration only)
 .venv/bin/python score.py --selftest   # check the scorer itself (needs only the corpus and ground truth)
 ```
 
-`run.sh` builds `@cognipeer/to-markdown` from this checkout if `dist/` is missing
-(`npm ci && npm run build`), creates `.venv` and installs `requirements.txt` with
+`run.sh` installs and builds `@cognipeer/to-markdown` from this checkout on every run
+(`npm ci && npm run build`), so the measured `dist/` always matches the recorded commit (`SKIP_BUILD=1` reuses
+an existing build when iterating locally; don't use it for reported runs). It creates `.venv` and installs `requirements.txt` with
 `requirements.lock.txt` as a pip constraints file (`-c`), so every transitive dependency resolves to the
 benchmarked version. `collect_env.py` compares the installed packages with the lock file, records any
 drift in `results/env.json` and stops the run if there is any (set `ALLOW_LOCK_DRIFT=1` to override).
