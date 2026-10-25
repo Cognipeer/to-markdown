@@ -38,6 +38,25 @@ Optional OCR dependency (for default `tesseract` OCR provider):
 npm install tesseract.js
 ```
 
+## 📊 Benchmarks
+
+We compared to-markdown 3.5.0 with Microsoft MarkItDown 0.1.9 on PDF, DOCX, PPTX, XLSX, HTML and CSV
+using a small synthetic corpus with ground truth. **The benchmark was written by the to-markdown
+maintainers** and MarkItDown wins in places (notably PPTX structure). Each cell is
+`to-markdown / MarkItDown`; scores are percentages, times are milliseconds per file.
+
+| Format | Files | Text F1 | Structure score | Median ms/file |
+| --- | --- | --- | --- | --- |
+| DOCX | 5 | 100.0 / 100.0 | 100.0 / 100.0 | 20.8 / 93.6 |
+| PDF | 5 | 98.8 / 100.0 | 30.8 / 29.0 | 8.98 / 94.8 |
+| PPTX | 2 | 100.0 / 100.0 | 25.0 / 75.0 | 1.40 / 9.61 |
+| XLSX | 3 | 100.0 / 97.8 | 100.0 / 96.7 | 1.57 / 5.57 |
+| HTML | 5 | 100.0 / 100.0 | 100.0 / 100.0 | 1.12 / 3.22 |
+| CSV | 7 | 100.0 / 100.0 | 100.0 / 100.0 | 0.04 / 1.66 |
+
+Method, per-file results, failures, limitations and a one-command reproduction are in
+[benchmark/markitdown-comparison](./benchmark/markitdown-comparison/README.md).
+
 ## 🔧 Development
 
 ### Building from Source
