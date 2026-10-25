@@ -4,3 +4,4 @@ __pycache__/
 results/jobs.json
 results/to-markdown/*.md
 results/markitdown/*.md
+results/markitdown-direct/*.md

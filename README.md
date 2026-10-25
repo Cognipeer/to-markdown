@@ -42,17 +42,24 @@ npm install tesseract.js
 
 We compared to-markdown 3.5.0 with Microsoft MarkItDown 0.1.9 on PDF, DOCX, PPTX, XLSX, HTML and CSV
 using a small synthetic corpus with ground truth. **The benchmark was written by the to-markdown
-maintainers** and MarkItDown wins in places (notably PPTX structure). Each cell is
-`to-markdown / MarkItDown`; scores are percentages, times are milliseconds per file.
+maintainers**, and MarkItDown wins in places (notably PPTX structure, and slightly PDF text F1).
+Each cell is `to-markdown / MarkItDown`; scores are percentages, times are median milliseconds per
+file over 20 runs, in-process, on one laptop.
 
 | Format | Files | Text F1 | Structure score | Median ms/file |
 | --- | --- | --- | --- | --- |
-| DOCX | 5 | 100.0 / 100.0 | 100.0 / 100.0 | 20.8 / 93.6 |
-| PDF | 5 | 98.8 / 100.0 | 30.8 / 29.0 | 8.98 / 94.8 |
-| PPTX | 2 | 100.0 / 100.0 | 25.0 / 75.0 | 1.40 / 9.61 |
-| XLSX | 3 | 100.0 / 97.8 | 100.0 / 96.7 | 1.57 / 5.57 |
-| HTML | 5 | 100.0 / 100.0 | 100.0 / 100.0 | 1.12 / 3.22 |
-| CSV | 7 | 100.0 / 100.0 | 100.0 / 100.0 | 0.04 / 1.66 |
+| DOCX | 5 | 100.0 / 100.0 | 100.0 / 100.0 | 18.1 / 75.6 |
+| PDF | 5 | 98.8 / 100.0 | 83.0 / 80.0 | 7.85 / 94.1 |
+| PPTX | 2 | 100.0 / 100.0 | 25.0 / 75.0 | 1.12 / 10.7 |
+| XLSX | 3 | 100.0 / 97.8 | 100.0 / 96.7 | 1.24 / 5.97 |
+| HTML | 5 | 100.0 / 100.0 | 100.0 / 100.0 | 0.81 / 3.29 |
+| CSV | 7 | 100.0 / 100.0 | 100.0 / 100.0 | 0.027 / 1.48 |
+
+The corpus is too clean to separate the tools on DOCX, HTML and CSV (both score 100), and several
+PDF differences rest on a single file. The PDF structure score covers list recall and table F1 only,
+because neither tool recovers PDF headings or links. Speed ratios are order of magnitude: timings are
+noisy, and much of the gap on tiny files is MarkItDown's per-call content-type detection (called
+through its converter classes directly, HTML is about 1.3x apart and CSV is a tie).
 
 Method, per-file results, failures, limitations and a one-command reproduction are in
 [benchmark/markitdown-comparison](./benchmark/markitdown-comparison/README.md).

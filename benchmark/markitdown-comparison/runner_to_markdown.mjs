@@ -12,13 +12,15 @@ const { convertToMarkdown } = await import(join(here, '..', '..', 'dist', 'index
 const pkg = JSON.parse(readFileSync(join(here, '..', '..', 'package.json'), 'utf8'));
 
 const [jobsFile, outDir, runsArg] = process.argv.slice(2);
-const runs = Number(runsArg ?? 5);
+const runs = Number(runsArg ?? 20);
 const jobs = JSON.parse(readFileSync(jobsFile, 'utf8'));
 mkdirSync(outDir, { recursive: true });
 
 const median = (xs) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const p95 = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1)]; };
-const r2 = (x) => Math.round(x * 100) / 100;
+const r3 = (x) => Math.round(x * 1000) / 1000;
+// linear-interpolated quantile (type 7), same as Python statistics.quantiles(method='inclusive')
+const quantile = (xs, q) => { const s = [...xs].sort((a, b) => a - b); const h = (s.length - 1) * q; const lo = Math.floor(h); return s[lo] + (h - lo) * ((s[Math.min(lo + 1, s.length - 1)]) - s[lo]); };
 
 const files = {};
 for (const job of jobs) {
@@ -33,7 +35,7 @@ for (const job of jobs) {
       await convertToMarkdown(job.path);
       times.push(performance.now() - t0);
     }
-    Object.assign(rec, { ok: true, runs_ms: times.map(r2), median_ms: r2(median(times)), p95_ms: r2(p95(times)) });
+    Object.assign(rec, { ok: true, runs_ms: times.map(r3), median_ms: r3(median(times)), min_ms: r3(Math.min(...times)), max_ms: r3(Math.max(...times)), q1_ms: r3(quantile(times, 0.25)), q3_ms: r3(quantile(times, 0.75)), p95_ms: r3(p95(times)) });
   } catch (e) {
     rec.error = `${e?.name ?? 'Error'}: ${String(e?.message ?? e).slice(0, 400)}`;
     writeFileSync(join(outDir, `${job.id}.md`), '', 'utf8');

@@ -9,12 +9,22 @@ Normalisation (applied identically to ground truth and tool output):
   image wrappers keep their visible text only), Unicode NFKC, lowercase, drop
   U+0307 (Turkish dotted I artefact), then tokenise: each CJK character is its
   own token, other words are runs of letters/digits (internal . , ' kept for
-  numbers and contractions); decimals are compared by value (9.50 == 9.5).
+  numbers and contractions); decimals are compared by value (9.50 == 9.5, so a
+  float rendering such as 1200.0 for 1200 is NOT penalised).
+
+HTML comments and tags are stripped from BOTH the ground truth and every tool's
+output before scoring, so marker comments such as `<!-- Slide number: 1 -->`
+(MarkItDown) or `<!-- ppt/slides/slide1.xml -->` (to-markdown) cost neither tool
+anything in the text metrics.
+
+`python score.py --selftest` checks the scorer itself (no results needed).
 """
 import difflib
 import json
+import random
 import re
 import statistics
+import sys
 import unicodedata
 from collections import Counter
 from pathlib import Path
@@ -27,6 +37,11 @@ TOOLS = [("to-markdown", "to-markdown"), ("markitdown", "MarkItDown")]
 METRICS = ["text_f1", "order", "heading_recall", "heading_level", "list_recall",
            "list_markup", "table_f1", "link_recall"]
 STRUCT = ["heading_recall", "heading_level", "list_recall", "table_f1", "link_recall"]
+# PDF structure is only visual and link URLs live in annotations. Neither tool recovers PDF headings
+# or links (0 for both), so those 0/0 elements would dominate the PDF structure score. They stay in the
+# per-metric fidelity table, but the structure score for PDF uses only list recall and table F1.
+STRUCT_BY_FORMAT = {"pdf": ["list_recall", "table_f1"]}
+TIMING_KEYS = ("median_ms", "min_ms", "max_ms", "q1_ms", "q3_ms", "p95_ms")
 
 CJK = "\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
 TOKEN = re.compile(rf"[{CJK}]|\d+(?:[.,]\d+)+|[^\W_]+(?:['\u2019][^\W_]+)*")
@@ -157,6 +172,8 @@ def main():
     manifest = json.loads((HERE / "corpus" / "manifest.json").read_text(encoding="utf-8"))["files"]
     env = json.loads((RES / "env.json").read_text()) if (RES / "env.json").exists() else {}
     timings = {t: json.loads((RES / t / "timings.json").read_text()) for t, _ in TOOLS}
+    direct_path = RES / "markitdown-direct" / "timings.json"
+    direct = json.loads(direct_path.read_text()) if direct_path.exists() else None
     per_file = []
     for entry in manifest:
         for t, _ in TOOLS:
@@ -164,8 +181,7 @@ def main():
             out = path.read_text(encoding="utf-8") if path.exists() else ""
             tm = timings[t]["files"].get(entry["file"], {})
             row = {"file": entry["file"], "format": entry["format"], "tool": t, "ok": tm.get("ok", False),
-                   "error": tm.get("error"), "median_ms": tm.get("median_ms"), "p95_ms": tm.get("p95_ms"),
-                   "out_chars": len(out)}
+                   "error": tm.get("error"), **{k: tm.get(k) for k in TIMING_KEYS}, "out_chars": len(out)}
             row.update({k: round(v, 4) for k, v in score_file(entry, out).items()})
             per_file.append(row)
 
@@ -179,15 +195,23 @@ def main():
             for m in METRICS + ["text_f1_nfc"]:
                 vals = [r[m] for r in rows if m in r]
                 agg[m] = round(mean(vals), 4) if vals else None
-            sv = []
-            for r in rows:
-                sv += [r[m] for m in STRUCT if m in r]
             # structure score: per-file mean of applicable structural metrics, then mean over files
-            per = [mean([r[m] for m in STRUCT if m in r]) for r in rows if any(m in r for m in STRUCT)]
+            keys = STRUCT_BY_FORMAT.get(f, STRUCT)
+            per = [mean([r[m] for m in keys if m in r]) for r in rows if any(m in r for m in keys)]
             agg["structure"] = round(mean(per), 4) if per else None
-            ms = [r["median_ms"] for r in rows if r["ok"]]
-            agg["median_ms"] = round(statistics.median(ms), 2) if ms else None
+            ok = [r for r in rows if r["ok"]]
+            ms = [r["median_ms"] for r in ok]
+            agg["median_ms"] = round(statistics.median(ms), 3) if ms else None
             agg["total_median_ms"] = round(sum(ms), 2) if ms else None
+            # run-to-run spread: (slowest run - fastest run) / median, per file
+            spread = [(r["max_ms"] - r["min_ms"]) / r["median_ms"] for r in ok if r["median_ms"]]
+            agg["spread_median"] = round(statistics.median(spread), 3) if spread else None
+            agg["spread_max"] = round(max(spread), 3) if spread else None
+            if direct and t == "markitdown":
+                dm = [direct["files"][r["file"]]["median_ms"] for r in ok
+                      if direct["files"].get(r["file"], {}).get("ok")]
+                agg["direct_median_ms"] = round(statistics.median(dm), 3) if dm else None
+                agg["direct_total_median_ms"] = round(sum(dm), 2) if dm else None
             per_format[f][t] = agg
 
     robust = []
@@ -196,11 +220,15 @@ def main():
             row = {"file": jid[len("robust__"):]}
             for t, _ in TOOLS:
                 tm = timings[t]["files"].get(jid, {})
-                row[t] = {k: tm.get(k) for k in ("ok", "median_ms", "p95_ms", "out_chars", "error")}
+                row[t] = {k: tm.get(k) for k in ("ok", *TIMING_KEYS, "out_chars", "error")}
             robust.append(row)
 
     summary = {"env": env, "tool_meta": {t: timings[t]["meta"] for t, _ in TOOLS},
                "per_format": per_format, "per_file": per_file, "robustness": robust}
+    if direct:
+        summary["markitdown_converter_only"] = {
+            "meta": direct["meta"],
+            "per_file": {k: {m: v.get(m) for m in ("ok", *TIMING_KEYS)} for k, v in direct["files"].items()}}
     (RES / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (RES / "summary.md").write_text(render_md(summary, fmts), encoding="utf-8")
     print((RES / "summary.md").read_text(encoding="utf-8"))
@@ -216,7 +244,9 @@ def pair(pf, f, key, fmt=pct):
 
 
 def ms(x):
-    return "n/a" if x is None else (f"{x:.2f}" if x < 10 else f"{x:.1f}")
+    if x is None:
+        return "n/a"
+    return f"{x:.3f}" if x < 0.1 else f"{x:.2f}" if x < 10 else f"{x:.1f}"
 
 
 def render_md(s, fmts):
@@ -231,7 +261,9 @@ def render_md(s, fmts):
           "| Format | Files | Text F1 | Structure score | Median ms/file |", "| --- | --- | --- | --- | --- |"]
     for f in fmts:
         L.append(f"| {f.upper()} | {pf[f]['to-markdown']['n_files']} | {pair(pf, f, 'text_f1')} | {pair(pf, f, 'structure')} | {pair(pf, f, 'median_ms', ms)} |")
-    L += ["", "Structure score is the unweighted mean of the structural metrics that apply to a file (heading recall, heading level accuracy, list item recall, table cell F1, link URL recall), averaged over files.", "",
+    L += ["", "Structure score is the unweighted mean of the structural metrics that apply to a file (heading recall, heading level accuracy, list item recall, table cell F1, link URL recall), averaged over files. "
+          "For PDF it uses only list recall and table cell F1: neither tool recovers PDF headings or link URLs (0 for both), and those elements would otherwise dominate the number. "
+          "They remain in the fidelity table below. Median ms is the median over files of each file's median time.", "",
           "## Fidelity by format", "",
           "| Format | Text F1 | Reading order | Heading recall | Heading level | List recall | List markup | Table cell F1 | Link recall |",
           "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
@@ -246,28 +278,106 @@ def render_md(s, fmts):
         L.append(f"| {f.upper()} | {pair(pf, f, 'text_f1')} | {pair(pf, f, 'text_f1_nfc')} |")
     L += ["",
           "## Speed by format", "",
-          "| Format | Median of per-file medians (ms) | Sum of per-file medians (ms) | Failures |", "| --- | --- | --- | --- |"]
+          "Times are the cost of each tool's default public API call from its own runtime. MarkItDown's call includes content-type "
+          "detection (Magika) and format dispatch; that cost is not separated in this table (see the converter-only table below).", "",
+          "| Format | Median of per-file medians (ms) | Sum of per-file medians (ms) | Run-to-run spread, median file (max-min)/median | Worst file | Failures |",
+          "| --- | --- | --- | --- | --- | --- |"]
     for f in fmts:
+        a, b = pf[f]["to-markdown"], pf[f]["markitdown"]
         L.append(f"| {f.upper()} | {pair(pf, f, 'median_ms', ms)} | {pair(pf, f, 'total_median_ms', ms)} | "
-                 f"{pf[f]['to-markdown']['failures']} / {pf[f]['markitdown']['failures']} |")
+                 f"{a['spread_median'] * 100:.0f}% / {b['spread_median'] * 100:.0f}% | {a['spread_max'] * 100:.0f}% / {b['spread_max'] * 100:.0f}% | "
+                 f"{a['failures']} / {b['failures']} |")
+    if "markitdown_converter_only" in s:
+        L += ["", "### MarkItDown converter-only (secondary)", "",
+              "MarkItDown's format converter class called directly on an open file with the extension given: no content-type "
+              "detection, no dispatch. Corpus files only. The public-API column is the headline measurement above.", "",
+              "| Format | MarkItDown public API, median of medians (ms) | MarkItDown converter only (ms) | to-markdown (ms) |", "| --- | --- | --- | --- |"]
+        for f in fmts:
+            b = pf[f]["markitdown"]
+            L.append(f"| {f.upper()} | {ms(b['median_ms'])} | {ms(b['direct_median_ms'])} | {ms(pf[f]['to-markdown']['median_ms'])} |")
     L += ["", "## Per file", "",
-          "| File | Tool | Text F1 | Order | Headings | Levels | Lists | Tables | Links | Median ms | p95 ms |",
+          "Times are median [Q1-Q3] over the timed runs, in ms.", "",
+          "| File | Tool | Text F1 | Order | Headings | Levels | Lists | Tables | Links | Median [Q1-Q3] ms | Min-max ms |",
           "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for r in s["per_file"]:
         L.append(f"| {r['file']} | {dict(TOOLS)[r['tool']]} | " + " | ".join(
             pct(r.get(k)) for k in ["text_f1", "order", "heading_recall", "heading_level", "list_recall", "table_f1", "link_recall"])
-            + f" | {ms(r['median_ms'])} | {ms(r['p95_ms'])} |")
+            + f" | {ms(r['median_ms'])} [{ms(r['q1_ms'])}-{ms(r['q3_ms'])}] | {ms(r['min_ms'])}-{ms(r['max_ms'])} |")
     L += ["", "## Robustness and speed on the existing benchmark/test_files (no fidelity score)", "",
-          "| File | to-markdown ms (median / p95) | MarkItDown ms (median / p95) | Status |", "| --- | --- | --- | --- |"]
+          "| File | to-markdown ms (median [Q1-Q3]) | MarkItDown ms (median [Q1-Q3]) | Status |", "| --- | --- | --- | --- |"]
     for r in s["robustness"]:
         a, b = r["to-markdown"], r["markitdown"]
         st = ", ".join(f"{dict(TOOLS)[t]} failed: {r[t]['error']}" for t in ("to-markdown", "markitdown") if not r[t]["ok"]) or "both ok"
-        L.append(f"| {r['file']} | {ms(a['median_ms'])} / {ms(a['p95_ms'])} | {ms(b['median_ms'])} / {ms(b['p95_ms'])} | {st} |")
+        L.append(f"| {r['file']} | {ms(a['median_ms'])} [{ms(a['q1_ms'])}-{ms(a['q3_ms'])}] | {ms(b['median_ms'])} [{ms(b['q1_ms'])}-{ms(b['q3_ms'])}] | {st} |")
     fails = [r for r in s["per_file"] if not r["ok"]]
     L += ["", "## Failures on the scored corpus", ""]
     L += [f"- {r['file']} ({dict(TOOLS)[r['tool']]}): {r['error']}" for r in fails] or ["None."]
     return "\n".join(L) + "\n"
 
 
+def selftest():
+    """Sanity-check the scorer against synthetic outputs derived from the ground truth.
+    Needs corpus/manifest.json and ground_truth/, not results/. Exits non-zero on failure."""
+    manifest = json.loads((HERE / "corpus" / "manifest.json").read_text(encoding="utf-8"))["files"]
+    rng = random.Random(7)
+    failures, checks = [], 0
+
+    def check(cond, msg):
+        nonlocal checks
+        checks += 1
+        if not cond:
+            failures.append(msg)
+
+    def pipes_removed(md):
+        return "\n".join(ln.replace("|", " ") if ln.strip().startswith("|") else ln for ln in md.splitlines())
+
+    def nan_cells(md):  # what a pandas-based converter writes for an empty cell
+        return re.sub(r"\|\s*(?=\|)", "| NaN ", md)
+
+    # unit checks on normalisation
+    check(tokens("9.50 and 1200.0") == tokens("9.5 and 1200"), "decimal folding: 9.50 == 9.5 and 1200.0 == 1200")
+    check(tokens("\ufb01gures") == tokens("figures"), "NFKC folds the fi ligature")
+    check(tokens("**Bold** [link](http://x.y) <!-- c --> <b>t</b>") == ["bold", "link", "t"], "markup and comments are stripped")
+    check(tokens("日本語") == ["日", "本", "語"], "each CJK character is one token")
+
+    for e in manifest:
+        gt = (HERE / e["gt"]).read_text(encoding="utf-8")
+        name, carried = e["file"], set(e["carries"])
+        ident = score_file(e, gt)
+        applicable = [k for k in ident if k != "text_f1_nfc"]
+        check(all(ident[k] == 1.0 for k in applicable), f"{name}: ground truth against itself must score 100 on every metric, got {ident}")
+        empty = score_file(e, "")
+        check(empty["text_f1"] == 0 and empty["order"] == 0, f"{name}: empty output must score 0 text F1 and order")
+        check(all(empty[k] == 0 for k in applicable if k not in ("text_f1", "order")), f"{name}: empty output must score 0 on every structural metric")
+
+        blocks = [b for b in re.split(r"\n\s*\n", gt) if b.strip()]
+        shuffled = blocks[:]
+        for _ in range(10):
+            rng.shuffle(shuffled)
+            if shuffled != blocks:
+                break
+        if shuffled != blocks and len(blocks) > 1:
+            sh = score_file(e, "\n\n".join(shuffled))
+            check(sh["text_f1"] == 1.0, f"{name}: shuffling blocks must not change text F1")
+            check(sh["order"] < 1.0, f"{name}: shuffling blocks must lower the order score")
+            other = [k for k in applicable if k not in ("order",)]
+            check(all(sh[k] == 1.0 for k in other), f"{name}: shuffling blocks must only lower the order score, got {sh}")
+
+        if "tables" in carried and "table_f1" in ident:
+            np_ = score_file(e, pipes_removed(gt))
+            check(np_["table_f1"] == 0.0, f"{name}: removing table pipes must zero the table score")
+            check(all(np_[k] == ident[k] for k in applicable if k != "table_f1"), f"{name}: removing table pipes must only lower the table score, got {np_}")
+            if re.search(r"\|\s*\|", gt):
+                nn = score_file(e, nan_cells(gt))
+                check(nn["table_f1"] < 1.0, f"{name}: NaN in empty cells must lower the table score")
+
+    print(f"selftest: {checks - len(failures)}/{checks} checks passed over {len(manifest)} ground-truth files")
+    for f in failures:
+        print("FAIL:", f)
+    return 1 if failures else 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
     main()
