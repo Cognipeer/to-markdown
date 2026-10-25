@@ -1,0 +1,367 @@
+{
+  "files": [
+    {
+      "file": "08_workbook_inventory_t1.csv",
+      "format": "csv",
+      "gt": "ground_truth_derived/08_workbook_inventory_t1.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "08_workbook_inventory_t2.csv",
+      "format": "csv",
+      "gt": "ground_truth_derived/08_workbook_inventory_t2.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "08_workbook_inventory_t3.csv",
+      "format": "csv",
+      "gt": "ground_truth_derived/08_workbook_inventory_t3.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "09_workbook_turkce_t1.csv",
+      "format": "csv",
+      "gt": "ground_truth_derived/09_workbook_turkce_t1.md",
+      "lang": "tr",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "09_workbook_turkce_t2.csv",
+      "format": "csv",
+      "gt": "ground_truth_derived/09_workbook_turkce_t2.md",
+      "lang": "tr",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "10_workbook_multilingual_t1.csv",
+      "format": "csv",
+      "gt": "ground_truth_derived/10_workbook_multilingual_t1.md",
+      "lang": "mul",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "10_workbook_multilingual_t2.csv",
+      "format": "csv",
+      "gt": "ground_truth_derived/10_workbook_multilingual_t2.md",
+      "lang": "mul",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "01_handbook_en.docx",
+      "format": "docx",
+      "gt": "ground_truth/01_handbook_en.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "02_sales_report.docx",
+      "format": "docx",
+      "gt": "ground_truth/02_sales_report.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "03_turkce_rapor.docx",
+      "format": "docx",
+      "gt": "ground_truth/03_turkce_rapor.md",
+      "lang": "tr",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "04_multilingual.docx",
+      "format": "docx",
+      "gt": "ground_truth/04_multilingual.md",
+      "lang": "mul",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "05_long_report.docx",
+      "format": "docx",
+      "gt": "ground_truth/05_long_report.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "01_handbook_en.html",
+      "format": "html",
+      "gt": "ground_truth/01_handbook_en.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "02_sales_report.html",
+      "format": "html",
+      "gt": "ground_truth/02_sales_report.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "03_turkce_rapor.html",
+      "format": "html",
+      "gt": "ground_truth/03_turkce_rapor.md",
+      "lang": "tr",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "04_multilingual.html",
+      "format": "html",
+      "gt": "ground_truth/04_multilingual.md",
+      "lang": "mul",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "05_long_report.html",
+      "format": "html",
+      "gt": "ground_truth/05_long_report.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "01_handbook_en.pdf",
+      "format": "pdf",
+      "gt": "ground_truth/01_handbook_en.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "02_sales_report.pdf",
+      "format": "pdf",
+      "gt": "ground_truth/02_sales_report.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "03_turkce_rapor.pdf",
+      "format": "pdf",
+      "gt": "ground_truth/03_turkce_rapor.md",
+      "lang": "tr",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "04_multilingual.pdf",
+      "format": "pdf",
+      "gt": "ground_truth/04_multilingual.md",
+      "lang": "mul",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "05_long_report.pdf",
+      "format": "pdf",
+      "gt": "ground_truth/05_long_report.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "heading_levels",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "06_deck_roadmap.pptx",
+      "format": "pptx",
+      "gt": "ground_truth/06_deck_roadmap.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "07_deck_turkce.pptx",
+      "format": "pptx",
+      "gt": "ground_truth/07_deck_turkce.md",
+      "lang": "tr",
+      "carries": [
+        "text",
+        "order",
+        "headings",
+        "lists",
+        "tables",
+        "links"
+      ]
+    },
+    {
+      "file": "08_workbook_inventory.xlsx",
+      "format": "xlsx",
+      "gt": "ground_truth/08_workbook_inventory.md",
+      "lang": "en",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "09_workbook_turkce.xlsx",
+      "format": "xlsx",
+      "gt": "ground_truth/09_workbook_turkce.md",
+      "lang": "tr",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    },
+    {
+      "file": "10_workbook_multilingual.xlsx",
+      "format": "xlsx",
+      "gt": "ground_truth/10_workbook_multilingual.md",
+      "lang": "mul",
+      "carries": [
+        "text",
+        "order",
+        "tables"
+      ]
+    }
+  ]
+}
