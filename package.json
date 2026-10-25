@@ -47,7 +47,11 @@
     "jupyter",
     "to-markdown",
     "file-converter",
-    "typescript"
+    "typescript",
+    "pdf-to-markdown",
+    "llm",
+    "rag",
+    "ocr"
   ],
   "author": "Cognipeer",
   "license": "MIT",
@@ -58,7 +62,7 @@
   "bugs": {
     "url": "https://github.com/Cognipeer/to-markdown/issues"
   },
-  "homepage": "https://cognipeer.github.io/to-markdown",
+  "homepage": "https://docs.cognipeer.com/to-markdown/",
   "dependencies": {
     "@napi-rs/canvas": "^0.1.69",
     "@types/js-yaml": "^4.0.9",
