@@ -19,14 +19,19 @@ export async function renderPdfPageToPng(
 
   const { renderPageAsImage } = await import('unpdf');
 
-  // renderPageAsImage returns ArrayBuffer; convert to Buffer for Node.js consumers
-  const result = await renderPageAsImage(
-    await loadPdf(buffer),
-    pageNum,
-    { canvasImport, scale }
-  );
-
-  return Buffer.from(result);
+  const pdf = await loadPdf(buffer);
+  try {
+    // renderPageAsImage returns ArrayBuffer; convert to Buffer for Node.js consumers
+    const result = await renderPageAsImage(pdf, pageNum, { canvasImport, scale });
+    return Buffer.from(result);
+  } finally {
+    // unpdf only destroys documents it loaded itself.
+    try {
+      await pdf.loadingTask?.destroy?.();
+    } catch {
+      /* best effort */
+    }
+  }
 }
 
 /** A PDF page rasterised for OCR. */

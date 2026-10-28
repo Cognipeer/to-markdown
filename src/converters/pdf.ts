@@ -9,7 +9,7 @@ import type {
 import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
 import { countChars } from '../utils/chars.js';
 import { toIsoLangList } from '../utils/lang.js';
-import { OcrTimeoutError, runOcrTasks, type NormalizedOcrResult } from '../utils/ocrRunner.js';
+import { OcrTimeoutError, ocrConcurrency, runOcrTasks, type NormalizedOcrResult } from '../utils/ocrRunner.js';
 
 type PdfDocument = Awaited<ReturnType<typeof loadPdf>>;
 
@@ -520,7 +520,7 @@ async function convertLoadedPdf(
 
           try {
             const outcomes = await runOcrTasks(tasks, {
-              concurrency: ocrOpts.concurrency,
+              concurrency: ocrConcurrency(ocrOpts),
               timeoutMs: ocrOpts.timeoutMs,
               signal: conv.signal,
               onProgress: ocrOpts.onProgress,
@@ -842,7 +842,7 @@ async function convertPagesWithOcr(
       },
     }));
     const results = await runOcrTasks(tasks, {
-      concurrency: ocrOpts.concurrency,
+      concurrency: ocrConcurrency(ocrOpts),
       timeoutMs: ocrOpts.timeoutMs,
       signal: conv.signal,
       onProgress: ocrOpts.onProgress,

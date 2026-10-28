@@ -481,7 +481,9 @@ const md = await convertToMarkdown("./scan.pdf", {
 **Timeouts, abort and errors.** `timeoutMs` limits one OCR task (a timeout counts as a failure and adds an
 `ocr_timeout` warning). Pass `signal` to cancel: the conversion rejects with the signal's reason (an `AbortError`),
 and abort is never swallowed by `onError`. `onError` is `'comment'` (default for image files: `<!-- OCR failed: msg -->`),
-`'skip'` (default for `auto-page` and embedded images) or `'throw'`. VLM providers retry HTTP 429/5xx and network
+`'skip'` (default for `auto-page` and embedded images) or `'throw'`; it does not apply to the legacy `auto` / `always` PDF
+modes, which keep their 3.5.0 behaviour. With `documentHandler`, `timeoutMs` covers the single call for the whole document.
+EPUB images are never OCRed: setting `embeddedImages` on an EPUB only adds an `embedded_image_ocr_unsupported` warning. VLM providers retry HTTP 429/5xx and network
 errors (`vlm.retries`, default 2, with 1 s / 2 s backoff and `Retry-After` up to 30 s) and send the real image type.
 
 **TIFF, WEBP and BMP.** `.tif`, `.tiff`, `.webp` and `.bmp` are now treated as images. (Before 3.6 they were decoded

@@ -394,7 +394,7 @@ interface ImageReport {
 ```
 
 Warning codes: `ocr_page_failed`, `ocr_page_limit`, `ocr_image_failed`, `ocr_image_limit`,
-`ocr_timeout`, `tesseract_lang_missing`.
+`ocr_timeout`, `tesseract_lang_missing`, `embedded_image_ocr_unsupported` (EPUB images are never OCRed).
 
 ### toTesseractLang
 

@@ -6,7 +6,7 @@ import type { ImageReport, OCRImageKind, OCROptions } from '../types/index.js';
 import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
 import { countChars } from '../utils/chars.js';
 import { sniffImageMimeType } from '../utils/imageTranscode.js';
-import { OcrTimeoutError, runOcrTasks, type OcrTask, type OcrTaskOutcome } from '../utils/ocrRunner.js';
+import { OcrTimeoutError, ocrConcurrency, runOcrTasks, type OcrTask, type OcrTaskOutcome } from '../utils/ocrRunner.js';
 
 function imageMimeType(
   ext: string,
@@ -159,7 +159,8 @@ async function renderTiffPage(buffer: Buffer, index: number, autoRotate: boolean
   const sharp = (await import('sharp')).default;
   let pipeline = sharp(buffer, { page: index });
   if (autoRotate) pipeline = pipeline.rotate();
-  const { data, info } = await pipeline.png().toBuffer({ resolveWithObject: true });
+  // Fixed density: low TIFF resolutions make Leptonica print 'Invalid resolution' warnings.
+  const { data, info } = await pipeline.withMetadata({ density: 300 }).png().toBuffer({ resolveWithObject: true });
   return { buffer: data, mimeType: 'image/png', width: info.width, height: info.height };
 }
 
@@ -254,7 +255,12 @@ async function ocrImageFile(
   let outcomes: OcrTaskOutcome<string>[];
   try {
     const { ocrImageDetailed } = await import('../utils/ocr.js');
-    const taskCount = isTiff ? pageCount : 1;
+    // `maxPages` caps the OCR calls of a multi-page TIFF; the remaining frames are skipped.
+    const pageLimit = Number.isFinite(ocrOpts.maxPages) && ocrOpts.maxPages! >= 1 ? Math.floor(ocrOpts.maxPages!) : undefined;
+    const taskCount = isTiff ? (pageLimit ? Math.min(pageCount, pageLimit) : pageCount) : 1;
+    if (multiPage && taskCount < pageCount) {
+      conv.warn('ocr_page_limit', `${label}: ${pageCount} pages, ${taskCount} processed`);
+    }
     const tasks: OcrTask<string>[] = [];
     for (let i = 0; i < taskCount; i++) {
       tasks.push({
@@ -294,7 +300,7 @@ async function ocrImageFile(
       });
     }
     outcomes = await runOcrTasks(tasks, {
-      concurrency: ocrOpts.concurrency,
+      concurrency: ocrConcurrency(ocrOpts),
       timeoutMs: ocrOpts.timeoutMs,
       signal: conv.signal,
       onProgress: ocrOpts.onProgress,
@@ -339,7 +345,12 @@ async function ocrImageFile(
       }
     }
   });
-  if (multiPage) conv.stats.pageCount = pageCount;
+  if (multiPage) {
+    for (let page = outcomes.length + 1; page <= pageCount; page++) {
+      conv.pages.push({ page, source: 'skipped', chars: 0 });
+    }
+    conv.stats.pageCount = pageCount;
+  }
 
   if (firstError && onError === 'throw') throw new PassThroughError(firstError);
 

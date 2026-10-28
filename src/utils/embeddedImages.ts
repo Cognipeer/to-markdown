@@ -11,7 +11,7 @@ import type {
 import type { ConversionContext } from './conversionContext.js';
 import { countChars } from './chars.js';
 import { sniffImageMimeType, transcodeToPng } from './imageTranscode.js';
-import { OcrTimeoutError, runOcrTasks, type OcrTask } from './ocrRunner.js';
+import { OcrTimeoutError, ocrConcurrency, runOcrTasks, type OcrTask } from './ocrRunner.js';
 
 /** How embedded images appear in the Markdown (`ConverterOptions.images`). */
 export type EmbeddedImageMode = 'inline' | 'placeholder' | 'omit';
@@ -100,6 +100,8 @@ export function imageExtensionFor(mimeType: string | undefined): string {
 }
 
 /** One image found in a document. */
+const EMPTY_BUFFER = Buffer.alloc(0);
+
 export interface EmbeddedImageInput {
   buffer: Buffer;
   /** Declared content type; sniffed from the bytes / path when missing */
@@ -176,6 +178,20 @@ export class EmbeddedImageSession {
     };
     this.entries.push(entry);
 
+    const result = this.decide(entry, input, width, height);
+    // Only queued images are OCRed later: do not keep the bytes of the others.
+    if (!entry.queued) entry.input = { ...input, buffer: EMPTY_BUFFER };
+    return result;
+  }
+
+  /** Applies the size filter, dedupe and `maxImages` cap; sets `entry.queued`. */
+  private decide(
+    entry: EmbeddedImageEntry,
+    input: EmbeddedImageInput,
+    width: number | undefined,
+    height: number | undefined
+  ): EmbeddedImageEntry {
+    const report = entry.report;
     if (!this.policy.ocr) return entry;
 
     const { minWidth, minHeight, maxImages, dedupe } = this.policy.limits;
@@ -257,7 +273,7 @@ export class EmbeddedImageSession {
 
     // Cancellation rejects here and is never swallowed by `onError`.
     const outcomes = await runOcrTasks(tasks, {
-      concurrency: ocr.concurrency,
+      concurrency: ocrConcurrency(ocr),
       timeoutMs: ocr.timeoutMs,
       signal: this.conv.signal,
       onProgress: ocr.onProgress,
@@ -296,6 +312,8 @@ export class EmbeddedImageSession {
   private async prepare(entry: EmbeddedImageEntry): Promise<{ buffer: Buffer; mimeType: string | undefined }> {
     const type = entry.mimeType;
     const native = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']);
+    // tesseract.js reads bmp, jpg, png, pbm and webp, but not GIF.
+    if ((this.policy.ocr?.provider ?? 'tesseract') === 'tesseract') native.delete('image/gif');
     if (!type || native.has(type)) return { buffer: entry.input.buffer, mimeType: type };
     return { buffer: await transcodeToPng(entry.input.buffer, type), mimeType: 'image/png' };
   }

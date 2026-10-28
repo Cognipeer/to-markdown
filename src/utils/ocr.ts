@@ -3,7 +3,8 @@ import type { ConversionContext } from './conversionContext.js';
 import { fetchWithRetry } from './http.js';
 import { prepareImageForVlm } from './imageTranscode.js';
 import { toIsoLangList } from './lang.js';
-import { normalizeHandlerResult, type NormalizedOcrResult } from './ocrRunner.js';
+import { combineSignals } from './abort.js';
+import { normalizeHandlerResult, OcrTimeoutError, type NormalizedOcrResult } from './ocrRunner.js';
 import { TesseractSession } from './tesseract.js';
 
 const DEFAULT_OCR_PROMPT =
@@ -40,8 +41,39 @@ export async function ocrImageDetailed(
   context: OCRHandlerContext = {},
   conversion?: ConversionContext
 ): Promise<NormalizedOcrResult> {
+  const baseSignal = context.signal ?? conversion?.signal ?? opts.signal;
+  // Inside a conversion the shared runner applies `timeoutMs`; a standalone call does it here.
+  if (!conversion && opts.timeoutMs && opts.timeoutMs > 0) {
+    const timeoutController = new AbortController();
+    const combined = combineSignals(baseSignal, timeoutController.signal);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          const err = new OcrTimeoutError(opts.timeoutMs!);
+          timeoutController.abort(err);
+          reject(err);
+        }, opts.timeoutMs);
+      });
+      const running = runProvider(buffer, opts, context, combined.signal, conversion);
+      running.catch(() => undefined);
+      return await Promise.race([running, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      combined.dispose();
+    }
+  }
+  return runProvider(buffer, opts, context, baseSignal, conversion);
+}
+
+async function runProvider(
+  buffer: Buffer,
+  opts: OCROptions,
+  context: OCRHandlerContext,
+  signal: AbortSignal | undefined,
+  conversion: ConversionContext | undefined
+): Promise<NormalizedOcrResult> {
   const provider = opts.provider ?? 'tesseract';
-  const signal = context.signal ?? conversion?.signal;
   const started = Date.now();
   if (conversion) conversion.stats.ocrCalls++;
 

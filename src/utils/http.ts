@@ -26,6 +26,25 @@ export function parseRetryAfter(value: string | null | undefined, now = Date.now
   return undefined;
 }
 
+/** Statuses whose responses cannot carry a body. */
+const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
+
+/**
+ * Reads the whole body and returns an equivalent in-memory `Response`. Responses
+ * that cannot be rebuilt (non-standard objects) are returned unchanged.
+ */
+async function bufferResponse(response: Response): Promise<Response> {
+  if (!response || typeof response.arrayBuffer !== 'function' || !(response.headers instanceof Headers)) {
+    return response;
+  }
+  const bytes = await response.arrayBuffer();
+  return new Response(NULL_BODY_STATUSES.has(response.status) ? null : bytes, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 /**
  * `fetch` with retries on HTTP 429 / 5xx / network errors / attempt timeouts.
  * Backoff is 1 s, 2 s, 4 s, ...; a `Retry-After` header (up to 30 s) replaces the
@@ -56,7 +75,9 @@ export async function fetchWithRetry(
     let response: Response | undefined;
     let failure: unknown;
     try {
-      response = await fetch(url, { ...init, signal: combined.signal });
+      // Read the body while the attempt timer and the cancellation signal are still
+      // active, so a stalled download is cut off like a stalled request.
+      response = await bufferResponse(await fetch(url, { ...init, signal: combined.signal }));
     } catch (err) {
       if (signal && signal.aborted) throw abortReason(signal);
       failure = timeoutController.signal.aborted && isAbortError(err)

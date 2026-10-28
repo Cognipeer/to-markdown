@@ -1,5 +1,6 @@
-import type { OCRHandlerResult, OCRImageKind, OCRProgressEvent } from '../types/index.js';
+import type { OCRHandlerResult, OCRImageKind, OCROptions, OCRProgressEvent } from '../types/index.js';
 import { abortReason, combineSignals } from './abort.js';
+import { MAX_TESSERACT_WORKERS } from './tesseract.js';
 
 /** Thrown (and reported as `ocr_timeout`) when one OCR task exceeds `timeoutMs`. */
 export class OcrTimeoutError extends Error {
@@ -35,6 +36,17 @@ export interface OcrRunnerOptions {
   kind?: OCRImageKind;
   /** Stop starting new tasks after the first failed one (legacy sequential semantics) */
   stopOnError?: boolean;
+}
+
+/**
+ * Task concurrency to hand to {@link runOcrTasks} for `opts`. With the tesseract
+ * provider it is capped at the number of engine workers, so tasks never wait for
+ * a free worker inside their own timeout window (and rendered pages do not pile up).
+ */
+export function ocrConcurrency(opts: OCROptions): number {
+  const requested = Math.max(1, Math.floor(opts.concurrency ?? 1) || 1);
+  const provider = opts.provider ?? 'tesseract';
+  return provider === 'tesseract' ? Math.min(requested, MAX_TESSERACT_WORKERS) : requested;
 }
 
 function toError(err: unknown): Error {

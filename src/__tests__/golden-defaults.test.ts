@@ -41,6 +41,12 @@ const IGNORED_NAMES = new Set([".DS_Store"]);
  */
 const SKIPPED_SLOW: Record<string, string> = {};
 
+/**
+ * Files found by the scan that are intentionally NOT golden-guarded (key set).
+ * Empty on purpose: add an entry only for fixtures whose 3.5.0 output does not exist.
+ */
+const UNGUARDED_FILES = new Set<string>();
+
 const OCR_FIXTURE_DIR = "src/__tests__/fixtures/ocr";
 const OCR_PDFS = [
   `${OCR_FIXTURE_DIR}/mixed.pdf`,
@@ -184,9 +190,11 @@ function check(prefix: string, actual: Record<string, Entry>, timings: Record<st
       mismatches.push(`${key}\n    golden entry present but the file/conversion disappeared`);
     }
   }
-  if (unrecorded.length) {
-    console.warn(`Golden guard: ${unrecorded.length} entries have no recorded golden (new files?):\n  ${unrecorded.join("\n  ")}`);
-  }
+  expect(
+    unrecorded.filter((k) => !UNGUARDED_FILES.has(k)),
+    "Golden guard: files without a recorded golden. A new fixture must be recorded once with TM_GOLDEN_UPDATE=1 " +
+      "(only if its default output is new); otherwise add it to UNGUARDED_FILES with a reason."
+  ).toEqual([]);
   expect(mismatches, `Default output changed for:\n${mismatches.join("\n")}`).toEqual([]);
 }
 

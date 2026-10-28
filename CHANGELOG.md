@@ -45,10 +45,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- No breaking changes; defaults unchanged. With the options 3.5.0 knew
-  (including `ocr: true` and the legacy `pdfMode` values) the output is
-  byte-identical to 3.5.0, which a golden-output test enforces. Public types
-  only gained optional members and `OCRHandler` may still return a string.
+- No breaking changes. With the options 3.5.0 knew (including `ocr: true`
+  and the legacy `pdfMode` values) the document structure and text are
+  identical to 3.5.0 for the inputs covered by the golden-output test, which
+  uses a fixed fake OCR handler.
+- Public types gained optional members. Two existing types were widened:
+  `OCROptions.lang` is now `string | string[]` and `OCRHandler` may return
+  `string | OCRHandlerResult`. Handlers that return a string keep compiling,
+  but strict TypeScript code that reads `lang` as a `string`, or that calls a
+  stored `OCRHandler` and uses the result as a string, needs a narrowing.
+
+### Behaviour notes
+
+Calls that already worked in 3.5.0 differ in these runtime details:
+
+- VLM requests (`openai-vlm`, `anthropic-vlm`, `ollama-vlm`, `custom-vlm`)
+  send the real media type of the image instead of always `image/png`; types
+  the APIs do not accept are converted to PNG.
+- VLM calls retry on HTTP 429, 5xx and network errors (default `retries: 2`,
+  backoff 1 s and 2 s), so a persistent failure takes about 3 s longer to
+  surface. Opt out with `vlm.retries: 0`.
+- Image OCR applies the EXIF orientation by default (`autoRotate: true`):
+  handlers and Tesseract receive the re-encoded, rotated image for JPEGs with
+  an orientation tag. Opt out with `ocr.autoRotate: false`.
+- ISO `lang` values such as `'tr'` are mapped to Tesseract codes (`'tur'`);
+  other values pass through unchanged.
+- OCR handler contexts always carry `kind` and `index`, plus `signal` when a
+  signal is active.
+- With the Tesseract provider, `concurrency` is capped at 4 (the worker count).
 
 ## [3.5.0] - 2026-10-21
 

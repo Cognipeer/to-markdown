@@ -5,7 +5,7 @@ import { abortReason } from './abort.js';
 import { toTesseractLang } from './lang.js';
 
 /** Upper bound for parallel tesseract workers. */
-const MAX_TESSERACT_WORKERS = 4;
+export const MAX_TESSERACT_WORKERS = 4;
 /** `OEM.LSTM_ONLY`, the tesseract.js default. */
 const DEFAULT_OEM = 1;
 
@@ -70,6 +70,8 @@ export class TesseractSession {
   private scheduler: any;
   private starting: Promise<void> | undefined;
   private terminated = false;
+  /** Engine fully created (set synchronously with the assignment of worker/scheduler) */
+  private ready = false;
 
   constructor(
     private readonly opts: OCROptions,
@@ -131,10 +133,18 @@ export class TesseractSession {
     const lang = toTesseractLang(this.opts.lang) ?? 'eng';
     this.checkOffline(lang);
     const tesseract = await loadTesseract();
+    this.assertAlive();
     const createWorker = tesseract.createWorker ?? tesseract.default?.createWorker;
     const count = this.workerCount;
     if (count <= 1) {
-      this.worker = await this.createOne(createWorker, lang);
+      const worker = await this.createOne(createWorker, lang);
+      if (this.terminated) {
+        // Disposed while the engine was starting: release it right away.
+        await worker.terminate().catch(() => undefined);
+        this.assertAlive();
+      }
+      this.worker = worker;
+      this.ready = true;
       return;
     }
     const createScheduler = tesseract.createScheduler ?? tesseract.default?.createScheduler;
@@ -147,8 +157,18 @@ export class TesseractSession {
       await Promise.all(workers.map((w) => w.terminate().catch(() => undefined)));
       throw failed.reason;
     }
-    this.scheduler = createScheduler();
-    for (const w of workers) this.scheduler.addWorker(w);
+    if (this.terminated) {
+      await Promise.all(workers.map((w) => w.terminate().catch(() => undefined)));
+      this.assertAlive();
+    }
+    const scheduler = createScheduler();
+    for (const w of workers) scheduler.addWorker(w);
+    this.scheduler = scheduler;
+    this.ready = true;
+  }
+
+  private assertAlive(): void {
+    if (this.terminated) throw new Error('Tesseract session already terminated');
   }
 
   private ensure(): Promise<void> {
@@ -157,12 +177,28 @@ export class TesseractSession {
   }
 
   async recognize(buffer: Buffer, signal?: AbortSignal): Promise<TesseractRecognizeResult> {
-    if (this.terminated) throw new Error('Tesseract session already terminated');
+    this.assertAlive();
     await raceAbort(this.ensure(), signal);
+    this.assertAlive();
+    const worker = this.worker;
     const job: Promise<any> = this.scheduler
       ? this.scheduler.addJob('recognize', buffer)
-      : this.worker.recognize(buffer);
-    const { data } = await raceAbort(job, signal);
+      : worker.recognize(buffer);
+    let data: any;
+    try {
+      ({ data } = await raceAbort(job, signal));
+    } catch (err) {
+      // tesseract.js cannot cancel a running job. After a timeout / cancellation the
+      // single worker is dropped (and recreated on demand) so the next page does not
+      // queue behind the abandoned one and inherit its remaining run time.
+      if (signal?.aborted && worker && !this.scheduler && this.worker === worker && !this.terminated) {
+        this.worker = undefined;
+        this.starting = undefined;
+        this.ready = false;
+        worker.terminate().catch(() => undefined);
+      }
+      throw err;
+    }
     const out: TesseractRecognizeResult = { text: (data?.text ?? '').trim() };
     if (typeof data?.confidence === 'number') out.confidence = data.confidence;
     return out;
@@ -170,8 +206,12 @@ export class TesseractSession {
 
   async terminate(): Promise<void> {
     this.terminated = true;
-    const starting = this.starting;
-    if (starting) await starting.catch(() => undefined);
+    // A start still in flight (abort / dispose during the traineddata download) releases
+    // its own workers once it notices `terminated`; do not wait for it.
+    if (this.starting && !this.ready) {
+      this.starting.catch(() => undefined);
+      return;
+    }
     const { worker, scheduler } = this;
     this.worker = undefined;
     this.scheduler = undefined;

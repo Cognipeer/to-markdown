@@ -221,11 +221,11 @@ export interface OCROptions {
   pageTrigger?: OCRPageTrigger;
   /** How PDF pages are rasterised before OCR */
   render?: OCRRenderOptions;
-  /** OCR at most this many pages / candidate pages */
+  /** OCR at most this many pages / candidate pages (also frames of a multi-page TIFF) */
   maxPages?: number;
-  /** Number of OCR tasks run in parallel (default 1). Tesseract uses up to 4 workers. */
+  /** Number of OCR tasks run in parallel (default 1). With the tesseract provider it is capped at 4 (one worker each). */
   concurrency?: number;
-  /** Timeout of one OCR task in milliseconds (default: none) */
+  /** Timeout of one OCR task (one page, image or `documentHandler` call) in milliseconds (default: none) */
   timeoutMs?: number;
   /** Cancels the conversion: the returned promise rejects with an AbortError */
   signal?: AbortSignal;
@@ -235,10 +235,15 @@ export interface OCROptions {
    * What to do when OCR of a page/image fails. Default is the legacy behaviour of
    * each format (`'comment'` for images, `'skip'` for `auto-page` PDFs and for
    * images embedded in DOCX/PPTX/HTML, where a failure is recorded in the report and
-   * as an `ocr_image_failed` warning).
+   * as an `ocr_image_failed` warning). Does not apply to the legacy `auto` / `always`
+   * PDF modes, which keep their 3.5.0 behaviour (throw `PDF OCR failed:` without a text
+   * layer, otherwise keep the text layer).
    */
   onError?: 'comment' | 'skip' | 'throw';
-  /** OCR the whole PDF in a single call instead of rendering one image per page */
+  /**
+   * OCR the whole PDF in a single call instead of rendering one image per page.
+   * `timeoutMs` and `signal` then apply to that one call (the whole document), not per page.
+   */
   documentHandler?: OCRDocumentHandler;
   /** Local Tesseract engine settings (language data location, offline mode, psm) */
   tesseract?: TesseractOptions;
