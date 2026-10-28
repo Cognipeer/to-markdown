@@ -1,0 +1,281 @@
+{
+  "description": "sha256+length of convertToMarkdown() output recorded against @cognipeer/to-markdown 3.5.0. Never re-record to silence a failure; see golden-defaults.test.ts.",
+  "entries": {
+    "default:benchmark/markitdown-comparison/corpus/01_handbook_en.docx": {
+      "sha256": "47de3e749a198103e19087835564bae998ba4f2e8bbbb18a579bbe43c34fd552",
+      "length": 2426
+    },
+    "default:benchmark/markitdown-comparison/corpus/01_handbook_en.html": {
+      "sha256": "47de3e749a198103e19087835564bae998ba4f2e8bbbb18a579bbe43c34fd552",
+      "length": 2426
+    },
+    "default:benchmark/markitdown-comparison/corpus/01_handbook_en.pdf": {
+      "sha256": "a08faeb8d9b02b1e6cdc290751d7057cdc7e849cb9f3aa9783a9fe377f46b97b",
+      "length": 2358
+    },
+    "default:benchmark/markitdown-comparison/corpus/02_sales_report.docx": {
+      "sha256": "bd9c3ab082fb67beed08856518b1e077993012df677d838637bae4e53e224ed1",
+      "length": 1725
+    },
+    "default:benchmark/markitdown-comparison/corpus/02_sales_report.html": {
+      "sha256": "bd9c3ab082fb67beed08856518b1e077993012df677d838637bae4e53e224ed1",
+      "length": 1725
+    },
+    "default:benchmark/markitdown-comparison/corpus/02_sales_report.pdf": {
+      "sha256": "a11840ecd38190ac37f4d00b40e7c2aad16f891a4e5e7a5e34352accc72b6846",
+      "length": 1636
+    },
+    "default:benchmark/markitdown-comparison/corpus/03_turkce_rapor.docx": {
+      "sha256": "a170bc31280d46d48157cb5304581205da93bac9306c8ca27b99fd4201f2865d",
+      "length": 1758
+    },
+    "default:benchmark/markitdown-comparison/corpus/03_turkce_rapor.html": {
+      "sha256": "a170bc31280d46d48157cb5304581205da93bac9306c8ca27b99fd4201f2865d",
+      "length": 1758
+    },
+    "default:benchmark/markitdown-comparison/corpus/03_turkce_rapor.pdf": {
+      "sha256": "9358ce620962cc205167dfe594f8235ff3d23a3c6d4613fc4047677128811820",
+      "length": 1519
+    },
+    "default:benchmark/markitdown-comparison/corpus/04_multilingual.docx": {
+      "sha256": "af6ea8b6c574cc66c2bf573ae9255584269f43c0b8ad571fbcd7a3be180f8bde",
+      "length": 1416
+    },
+    "default:benchmark/markitdown-comparison/corpus/04_multilingual.html": {
+      "sha256": "af6ea8b6c574cc66c2bf573ae9255584269f43c0b8ad571fbcd7a3be180f8bde",
+      "length": 1416
+    },
+    "default:benchmark/markitdown-comparison/corpus/04_multilingual.pdf": {
+      "sha256": "ce241fe191fa35ccfea5ec07a55daf0ec256d74946166da8dfad550f12eaefc7",
+      "length": 1839
+    },
+    "default:benchmark/markitdown-comparison/corpus/05_long_report.docx": {
+      "sha256": "d31a8854e73a896d744385ac8efedca916d4c8a413cf39c9db4ff4f40b869cbf",
+      "length": 31597
+    },
+    "default:benchmark/markitdown-comparison/corpus/05_long_report.html": {
+      "sha256": "d31a8854e73a896d744385ac8efedca916d4c8a413cf39c9db4ff4f40b869cbf",
+      "length": 31597
+    },
+    "default:benchmark/markitdown-comparison/corpus/05_long_report.pdf": {
+      "sha256": "95bcc4ea090eba26e8c4f657f970ee2e61b30b016f4267e33bc73b1d9fc086c4",
+      "length": 30854
+    },
+    "default:benchmark/markitdown-comparison/corpus/06_deck_roadmap.pptx": {
+      "sha256": "bd5d28257bdee48a42b50d145610f36c59effb2c08a5bccdd3e95b17481009a6",
+      "length": 1211
+    },
+    "default:benchmark/markitdown-comparison/corpus/07_deck_turkce.pptx": {
+      "sha256": "2dd50124b67e25ab610f7cf15c9f27791049fae5a063def58bde1f5bcccf3c85",
+      "length": 1025
+    },
+    "default:benchmark/markitdown-comparison/corpus/08_workbook_inventory.xlsx": {
+      "sha256": "840f0e148df51019d47a6b3b71cba45f43bd93e9d15fc9a39cd8e822a07f37d9",
+      "length": 819
+    },
+    "default:benchmark/markitdown-comparison/corpus/08_workbook_inventory_t1.csv": {
+      "sha256": "80276156334a05d64c9c7da588035aae1a9b11cdb35035884c29ff31e26442a3",
+      "length": 319
+    },
+    "default:benchmark/markitdown-comparison/corpus/08_workbook_inventory_t2.csv": {
+      "sha256": "4ce19499374f9d1eaa679a515f9a151171dfc325127b6f9e64a86f6caf62af02",
+      "length": 232
+    },
+    "default:benchmark/markitdown-comparison/corpus/08_workbook_inventory_t3.csv": {
+      "sha256": "d36b312e8f6beb3541d690c840f57b2956ffd96894b06f575fb8bd14042daf87",
+      "length": 211
+    },
+    "default:benchmark/markitdown-comparison/corpus/09_workbook_turkce.xlsx": {
+      "sha256": "6f3e011e0d78eef64aa50db4dc2cc7578e5dd8a725e3f365efbbeb4e4dcdd6e8",
+      "length": 455
+    },
+    "default:benchmark/markitdown-comparison/corpus/09_workbook_turkce_t1.csv": {
+      "sha256": "74516fb1b1366c33d46030ccc10b9d67fafe801baf8e8eedd1e6c987feec5770",
+      "length": 248
+    },
+    "default:benchmark/markitdown-comparison/corpus/09_workbook_turkce_t2.csv": {
+      "sha256": "71b1af816ec4b8ab29b830669d7dae23b5decca55e34878249081b97f58d6e1b",
+      "length": 165
+    },
+    "default:benchmark/markitdown-comparison/corpus/10_workbook_multilingual.xlsx": {
+      "sha256": "c31b62a71f36273b92047c02200000bb7cb1e1f424220a61992730928a6133c9",
+      "length": 364
+    },
+    "default:benchmark/markitdown-comparison/corpus/10_workbook_multilingual_t1.csv": {
+      "sha256": "fb3de279e01de45bdeba4edbe967426b3e7c994448eb725d5b46e40a09757c3d",
+      "length": 204
+    },
+    "default:benchmark/markitdown-comparison/corpus/10_workbook_multilingual_t2.csv": {
+      "sha256": "d3d050d4561be60c9f5fcf80058e429c876437902d7a76943590e4799dccface",
+      "length": 140
+    },
+    "default:benchmark/markitdown-comparison/corpus/manifest.json": {
+      "sha256": "7c6b676bce85ab6d9189803dbaf20d375224139af4c060b7d93b22e3cd2b3c97",
+      "length": 5291
+    },
+    "default:benchmark/test_files/test.docx": {
+      "sha256": "f9a4657d73e703c1c9879e7da27e41dfb99006fbc67843e37786471d9e2d2a7d",
+      "length": 161268
+    },
+    "default:benchmark/test_files/test.epub": {
+      "sha256": "aad0149cabde6131f8a87a2698cf1b17f20408955ec56f671c2f82fe88997d15",
+      "length": 342
+    },
+    "default:benchmark/test_files/test.jpg": {
+      "sha256": "d1fca3abec873aecd3646e3f2003d48c226a0bd421acb4b1b85c5c92f7d1701b",
+      "length": 32
+    },
+    "default:benchmark/test_files/test.mp3": {
+      "sha256": "ccc07ee531ce467ddfd5e6e848019606a2305b5644b121993e1873c0ae55af28",
+      "length": 145
+    },
+    "default:benchmark/test_files/test.msg": {
+      "sha256": "672c71f521632df55e7794ed8de3e88664d73d31909b06d01a41706a3493bb37",
+      "length": 190
+    },
+    "default:benchmark/test_files/test.pdf": {
+      "sha256": "5d231db2b8621e58649e350b48aa6560aca4e69b55b4d9d9690b17fb30ae3d21",
+      "length": 5186
+    },
+    "default:benchmark/test_files/test.pptx": {
+      "sha256": "36fcc763235fc710bfe6c045239eabedb9459766c664ed840b1939e956931bda",
+      "length": 1686
+    },
+    "default:benchmark/test_files/test.xls": {
+      "sha256": "7031333d5a2a8f5832896f38c577c25856bb154a4d35f4b254f2257406bc8e4a",
+      "length": 810
+    },
+    "default:benchmark/test_files/test.xlsx": {
+      "sha256": "7031333d5a2a8f5832896f38c577c25856bb154a4d35f4b254f2257406bc8e4a",
+      "length": 810
+    },
+    "default:benchmark/test_files/test_blog.html": {
+      "sha256": "a0d6e61743561eb0f4eab8c774587d4786a56cfc3d745352396b396d8897afca",
+      "length": 8145
+    },
+    "default:benchmark/test_files/test_files.zip": {
+      "sha256": "fb1ff9f8f9bdf3c7ab37313ee0ef1c925cf6ac733aa0a7bd15161bb2ef63a51e",
+      "length": 191851
+    },
+    "default:benchmark/test_files/test_mskanji.csv": {
+      "sha256": "15c447a7d8d5b8a7ef927c8c0dd3529f8036c4746c86e8308a1bf2c57cb74f5f",
+      "length": 93
+    },
+    "default:benchmark/test_files/test_notebook.ipynb": {
+      "sha256": "d1e20bb0de857ca09aadff95d3ee3ebdf000af13092015a8ed7c403334d65c9a",
+      "length": 123
+    },
+    "default:benchmark/test_files/test_rss.xml": {
+      "sha256": "014773690c17ff205ccdfda2fefbed549b07247e7c9ff5533de0ec6ccfa18fde",
+      "length": 8330
+    },
+    "default:benchmark/test_files/test_serp.html": {
+      "sha256": "cd95c341c63d0d8bd4c4dbd621d6a6bc35fbdff1bc55ef089fda7fa003d3d4f4",
+      "length": 63832
+    },
+    "default:benchmark/test_files/test_wikipedia.html": {
+      "sha256": "8b8d2e08fa39323b3b218062348b5bb771c50edc073841073a6c88f76a8682ac",
+      "length": 119569
+    },
+    "default:src/__tests__/fixtures/ccitt-g4.pdf": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "length": 0
+    },
+    "default:src/__tests__/fixtures/ocr/garbled.pdf": {
+      "sha256": "e93dade9052a006cf2223679cb3cc31eb9aa1ee65436484628793f550089abf7",
+      "length": 217
+    },
+    "default:src/__tests__/fixtures/ocr/images.docx": {
+      "sha256": "655296fdf776bbc616325980d00438a0f2b8afde8bc0cd5e9063753780f29fd5",
+      "length": 104860
+    },
+    "default:src/__tests__/fixtures/ocr/images.html": {
+      "sha256": "604d8cb143e7ae55677ab6aba9343f0c6a019060020b4d15f960906d434e7934",
+      "length": 69343
+    },
+    "default:src/__tests__/fixtures/ocr/mixed.pdf": {
+      "sha256": "005c2f4043c0a15fc833a42a107705cb72110fee0e6c1255c46ba1ced7b7954f",
+      "length": 499
+    },
+    "default:src/__tests__/fixtures/ocr/rotated.jpg": {
+      "sha256": "38c0a6af60672fb0a72a7817da5c4ff1b6bef83a9bb64092c85fd5ab588ab8b7",
+      "length": 31
+    },
+    "default:src/__tests__/fixtures/ocr/sample.png": {
+      "sha256": "90b297065ddd3b1298bbef8cbe9cf497bbd307c3bb95074ed1a2c0b17be173b6",
+      "length": 31
+    },
+    "default:src/__tests__/fixtures/ocr/scan.pdf": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "length": 0
+    },
+    "default:src/__tests__/fixtures/ocr/slides.pptx": {
+      "sha256": "52528f5b098572420602b1779f27bf00f2ba07c0a4f99624f7486a331ac1ba80",
+      "length": 214
+    },
+    "default:src/__tests__/fixtures/ocr/stamp.pdf": {
+      "sha256": "08abffe9abf727b1f22428b336c5aef2d022898f6d0acda5a04c0f8206ce3a1d",
+      "length": 18
+    },
+    "ocr-handler:always:benchmark/test_files/test.pdf": {
+      "sha256": "299bb7fc15fe871b7161701fae84c685106dcbce6ab19f033deaa00e2fd18d1a",
+      "length": 6
+    },
+    "ocr-handler:always:src/__tests__/fixtures/ocr/garbled.pdf": {
+      "sha256": "1a5359d33f67e63a1aa048cda5013fa898472fe68d057d16b1b8831520aeef65",
+      "length": 14
+    },
+    "ocr-handler:always:src/__tests__/fixtures/ocr/mixed.pdf": {
+      "sha256": "530bc9fb1bc1bd747e598a02402fa5971bb47ca885b37fdc55a4c0f431db750b",
+      "length": 22
+    },
+    "ocr-handler:always:src/__tests__/fixtures/ocr/scan.pdf": {
+      "sha256": "1a5359d33f67e63a1aa048cda5013fa898472fe68d057d16b1b8831520aeef65",
+      "length": 14
+    },
+    "ocr-handler:always:src/__tests__/fixtures/ocr/stamp.pdf": {
+      "sha256": "299bb7fc15fe871b7161701fae84c685106dcbce6ab19f033deaa00e2fd18d1a",
+      "length": 6
+    },
+    "ocr-handler:auto:benchmark/test_files/test.pdf": {
+      "sha256": "5d231db2b8621e58649e350b48aa6560aca4e69b55b4d9d9690b17fb30ae3d21",
+      "length": 5186
+    },
+    "ocr-handler:auto:src/__tests__/fixtures/ocr/garbled.pdf": {
+      "sha256": "e93dade9052a006cf2223679cb3cc31eb9aa1ee65436484628793f550089abf7",
+      "length": 217
+    },
+    "ocr-handler:auto:src/__tests__/fixtures/ocr/mixed.pdf": {
+      "sha256": "005c2f4043c0a15fc833a42a107705cb72110fee0e6c1255c46ba1ced7b7954f",
+      "length": 499
+    },
+    "ocr-handler:auto:src/__tests__/fixtures/ocr/scan.pdf": {
+      "sha256": "1a5359d33f67e63a1aa048cda5013fa898472fe68d057d16b1b8831520aeef65",
+      "length": 14
+    },
+    "ocr-handler:auto:src/__tests__/fixtures/ocr/stamp.pdf": {
+      "sha256": "08abffe9abf727b1f22428b336c5aef2d022898f6d0acda5a04c0f8206ce3a1d",
+      "length": 18
+    },
+    "ocr-handler:benchmark/test_files/test.jpg": {
+      "sha256": "bf0aa57da2e7cf4c962d92869943e22414ae4738ebeb4e392019ace4f83e6838",
+      "length": 59
+    },
+    "ocr-handler:src/__tests__/fixtures/ocr/images.docx": {
+      "sha256": "655296fdf776bbc616325980d00438a0f2b8afde8bc0cd5e9063753780f29fd5",
+      "length": 104860
+    },
+    "ocr-handler:src/__tests__/fixtures/ocr/rotated.jpg": {
+      "sha256": "3efc260a31fb8752f56d1a1828952907bd0f19105a180aea4db0db1d41505bbb",
+      "length": 58
+    },
+    "ocr-handler:src/__tests__/fixtures/ocr/sample.png": {
+      "sha256": "e1dc7c612aee7358139100776caa4fc1f490928b1119937ea90d6c17f0a4fc8f",
+      "length": 58
+    },
+    "ocr-handler:src/__tests__/fixtures/ocr/slides.pptx": {
+      "sha256": "52528f5b098572420602b1779f27bf00f2ba07c0a4f99624f7486a331ac1ba80",
+      "length": 214
+    }
+  }
+}
