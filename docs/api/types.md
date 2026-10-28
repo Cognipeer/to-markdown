@@ -36,6 +36,8 @@ interface ConverterOptions {
   url?: string;
   ocr?: boolean | OCROptions;
   doc?: DocOptions;
+  images?: 'inline' | 'placeholder' | 'omit';
+  imageMetadata?: boolean;
 }
 ```
 
@@ -72,6 +74,11 @@ enum FileExtension {
   JPEG = '.jpeg',
   PNG = '.png',
   GIF = '.gif',
+  // ... JSON, YAML, YML, EPUB, MSG
+  TIF = '.tif',     // 3.6.0
+  TIFF = '.tiff',   // 3.6.0
+  WEBP = '.webp',   // 3.6.0
+  BMP = '.bmp',     // 3.6.0
 }
 ```
 
@@ -167,17 +174,23 @@ Use `'handler'` when you supply your own async OCR function. The library does no
 
 ### OCRHandlerContext
 
-Metadata passed to a custom OCR handler.
+Metadata passed to a custom OCR handler. All fields are optional.
 
 ```typescript
 interface OCRHandlerContext {
-  page?: number;
+  page?: number;              // 1-based PDF page or TIFF frame
   pageCount?: number;
   mimeType?: string;
   sourceExtension?: string;
   fileName?: string;
   imageWidth?: number;
   imageHeight?: number;
+  kind?: OCRImageKind;        // 'pdf-page' | 'image' | 'tiff-page' | 'embedded-image'
+  index?: number;             // 0-based index of an embedded image
+  sourcePath?: string;        // e.g. 'word/media/image1.png'
+  slide?: number;             // PPTX slide number
+  langHint?: string[];        // ISO 639-1 codes, e.g. ['tr', 'en']
+  signal?: AbortSignal;       // aborted on cancel or task timeout
 }
 ```
 
@@ -189,7 +202,38 @@ interface OCRHandlerContext {
 type OCRHandler = (
   buffer: Buffer,
   context: OCRHandlerContext
-) => Promise<string>;
+) => Promise<string | OCRHandlerResult>;
+```
+
+A handler that returns a string keeps working unchanged.
+
+### OCRHandlerResult
+
+```typescript
+interface OCRHandlerResult {
+  text: string;
+  markdown?: string;      // preferred over `text` when present
+  confidence?: number;
+}
+```
+
+### OCRDocumentHandler
+
+OCR the whole PDF in one call. `pages` lists the 1-based pages that need OCR.
+
+```typescript
+interface OCRDocumentHandlerContext {
+  pages: number[];
+  pageCount: number;
+  fileName?: string;
+  langHint?: string[];
+  signal?: AbortSignal;
+}
+
+type OCRDocumentHandler = (
+  pdf: Buffer,
+  context: OCRDocumentHandlerContext
+) => Promise<Array<{ page: number; text: string; markdown?: string }>>;
 ```
 
 ---
@@ -199,14 +243,165 @@ type OCRHandler = (
 ```typescript
 interface OCROptions {
   provider?: OCRProvider;
-  lang?: string;
-  pdfMode?: 'auto' | 'always' | 'never';
+  lang?: string | string[];
+  pdfMode?: OCRPdfMode;
   vlm?: VLMOptions;
   handler?: OCRHandler;
+  // added in 3.6.0
+  pageTrigger?: OCRPageTrigger;
+  render?: OCRRenderOptions;
+  maxPages?: number;
+  concurrency?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  onProgress?: (event: OCRProgressEvent) => void;
+  onError?: 'comment' | 'skip' | 'throw';
+  documentHandler?: OCRDocumentHandler;
+  tesseract?: TesseractOptions;
+  embeddedImages?: boolean | EmbeddedImageOCROptions;
+  autoRotate?: boolean;
 }
 ```
 
-When `provider` is `'handler'`, `handler` is required.
+When `provider` is `'handler'`, `handler` (or `documentHandler` for PDFs) is required. See
+[Converter Options]({{ site.baseurl }}{% link api/options.md %}) for the defaults of every field.
+
+### OCRPdfMode
+
+```typescript
+type OCRPdfMode = 'auto' | 'auto-page' | 'always' | 'never';
+```
+
+### OCRPageTrigger
+
+```typescript
+interface OCRPageTrigger {
+  minChars?: number;         // default 32
+  maxGarbledRatio?: number;  // default 0.3 (0 disables)
+  requireImage?: boolean;    // default true
+}
+```
+
+### OCRRenderOptions
+
+```typescript
+interface OCRRenderOptions {
+  scale?: number;         // default 2
+  maxPixels?: number;     // default 40_000_000
+  format?: 'png' | 'jpeg';// default 'png'
+  jpegQuality?: number;   // default 85
+  grayscale?: boolean;    // default false
+}
+```
+
+### VLMOptions
+
+```typescript
+interface VLMOptions {
+  model: string;
+  apiKey?: string;
+  apiBase?: string;
+  prompt?: string;
+  maxTokens?: number;
+  retries?: number;     // 3.6.0, default 2
+  timeoutMs?: number;   // 3.6.0
+}
+```
+
+### TesseractOptions
+
+```typescript
+interface TesseractOptions {
+  langPath?: string;   // directory or URL with <lang>.traineddata[.gz]
+  cachePath?: string;
+  offline?: boolean;   // requires langPath; never downloads
+  psm?: number;
+  oem?: number;
+  gzip?: boolean;      // default true
+}
+```
+
+### EmbeddedImageOCROptions
+
+```typescript
+interface EmbeddedImageOCROptions {
+  minWidth?: number;   // default 64
+  minHeight?: number;  // default 64
+  maxImages?: number;  // default 50
+  dedupe?: boolean;    // default true
+}
+```
+
+### OCRImageKind and OCRProgressEvent
+
+```typescript
+type OCRImageKind = 'pdf-page' | 'image' | 'tiff-page' | 'embedded-image';
+
+interface OCRProgressEvent {
+  kind: OCRImageKind;
+  completed: number;
+  total: number;
+  page?: number;
+}
+```
+
+---
+
+## Detailed Conversion Types
+
+### DetailedConversion
+
+Returned by `convertToMarkdownDetailed(input, options?)`. `markdown` is identical to what
+`convertToMarkdown` returns for the same input and options.
+
+```typescript
+interface DetailedConversion {
+  markdown: string;
+  extension: string;
+  pages?: PageReport[];
+  images?: ImageReport[];
+  warnings: string[];   // "code: detail", e.g. 'ocr_page_failed: page 3: ...'
+  stats: {
+    pageCount?: number;
+    ocrCalls: number;
+    ocrPages: number;
+    ocrImages: number;
+    ocrMs: number;
+    renderMs: number;
+  };
+}
+
+interface PageReport {
+  page: number;
+  source: 'text' | 'ocr' | 'empty' | 'error' | 'skipped';
+  chars: number;
+  reason?: 'no-text' | 'low-text' | 'garbled' | 'always' | 'auto';
+  error?: string;
+  ms?: number;
+}
+
+interface ImageReport {
+  index: number;
+  kind: OCRImageKind;
+  path?: string;
+  width?: number;
+  height?: number;
+  ocr: boolean;
+  chars?: number;
+  skipped?: 'small' | 'duplicate' | 'limit';
+  error?: string;
+}
+```
+
+Warning codes: `ocr_page_failed`, `ocr_page_limit`, `ocr_image_failed`, `ocr_image_limit`,
+`ocr_timeout`, `tesseract_lang_missing`.
+
+### toTesseractLang
+
+```typescript
+function toTesseractLang(lang?: string | string[]): string | undefined;
+// toTesseractLang('tr+en') === 'tur+eng'; unknown codes pass through
+```
 
 ---
 

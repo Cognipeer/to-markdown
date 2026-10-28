@@ -16,7 +16,7 @@
 ## ✨ Features
 
 - 🎯 **Multiple Format Support**: Convert PDF, DOC, DOCX, HTML, Excel, CSV, and more
-- 🔎 **OCR Support**: Extract text from scanned PDFs and images
+- 🔎 **OCR Support**: Extract text from scanned PDFs (per page), images, multi-page TIFF and images embedded in DOCX/PPTX/HTML
 - 📦 **Simple API**: Easy to use with Promise-based interface
 - 🔧 **TypeScript First**: Written in TypeScript with full type definitions
 - 🚀 **Fast & Efficient**: Optimized for performance with modular architecture
@@ -107,6 +107,16 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📝 Changelog
 
 Full history: [CHANGELOG.md](./CHANGELOG.md).
+
+### Version 3.6.0
+
+- Added per-page PDF OCR (`pdfMode: 'auto-page'`), `documentHandler`, render options, `concurrency`,
+  `timeoutMs`, `signal`, `onProgress`, `onError` and `maxPages`.
+- Added `convertToMarkdownDetailed()` with page, image and timing reports, and `toTesseractLang()`.
+- Added offline Tesseract (`tesseract.langPath` / `offline`), ISO language codes and one reusable worker per conversion.
+- Added the `images` option (`placeholder` / `omit`) and OCR of images embedded in DOCX, PPTX and HTML.
+- Fixed TIFF, WEBP and BMP files being decoded as text.
+- No breaking changes; defaults unchanged.
 
 ### Version 3.5.0
 
@@ -311,15 +321,26 @@ Converts various file formats to Markdown.
   - `forceExtension?: string` - Force a specific file extension for processing
   - `url?: string` - Original URL (used for web content like YouTube or Bing search)
   - `ocr?: boolean | OCROptions` - Enable OCR for images and scanned PDFs (opt-in)
+  - `images?: 'inline' | 'placeholder' | 'omit'` - How images embedded in DOCX/HTML/EPUB/PPTX are rendered (default: `inline`, same as 3.5.0)
+  - `imageMetadata?: boolean` - Image files: emit the `ImageSize:` / `Format:` header (default: `true`)
   - `doc?: DocOptions` - Options for binary Word `.doc` conversion
 
 `OCROptions` includes:
 
 - `provider?: 'tesseract' | 'openai-vlm' | 'anthropic-vlm' | 'ollama-vlm' | 'azure-vision' | 'custom-vlm' | 'handler'`
-- `lang?: string` - Tesseract language code (default: `eng`)
-- `pdfMode?: 'auto' | 'always' | 'never'` - PDF OCR mode (default: `auto`)
-- `vlm?: { model: string; apiKey?: string; apiBase?: string; prompt?: string; maxTokens?: number }`
-- `handler?: (buffer, context) => Promise<string>` - Custom async OCR callback (required when `provider: 'handler'`; library makes no HTTP calls)
+- `lang?: string | string[]` - Tesseract codes (`'eng'`, `'tur+eng'`) or ISO 639-1 codes (`'tr'`, `'tr+en'`, `['tr', 'en']`); default `eng`
+- `pdfMode?: 'auto' | 'auto-page' | 'always' | 'never'` - PDF OCR mode (default: `auto`)
+- `vlm?: { model: string; apiKey?: string; apiBase?: string; prompt?: string; maxTokens?: number; retries?: number; timeoutMs?: number }`
+- `handler?: (buffer, context) => Promise<string | { text; markdown?; confidence? }>` - Custom async OCR callback (required when `provider: 'handler'`; library makes no HTTP calls)
+- `documentHandler?: (pdf, { pages, pageCount, ... }) => Promise<Array<{ page; text; markdown? }>>` - OCR the whole PDF in one call
+- `pageTrigger?: { minChars?; maxGarbledRatio?; requireImage? }` - which pages `auto-page` OCRs (defaults 32 / 0.3 / true)
+- `render?: { scale?; maxPixels?; format?: 'png' | 'jpeg'; jpegQuality?; grayscale? }` - how PDF pages are rasterised
+- `maxPages?`, `concurrency?`, `timeoutMs?`, `signal?`, `onProgress?`, `onError?: 'comment' | 'skip' | 'throw'`
+- `tesseract?: { langPath?; cachePath?; offline?; psm?; oem?; gzip? }` - local language data and engine settings
+- `embeddedImages?: boolean | { minWidth?; minHeight?; maxImages?; dedupe? }` - OCR images inside DOCX/PPTX/HTML (default off)
+- `autoRotate?: boolean` - honour EXIF orientation of image files before OCR (default `true`)
+
+Every new option is optional. Without them, `ocr: true` and the 3.5.0 `OCROptions` produce byte-identical output.
 
 `DocOptions` includes:
 
@@ -369,6 +390,120 @@ const customOcr = await convertToMarkdown("./scan.pdf", {
       return await myOcrSdk.recognize(buffer, context);
     },
   },
+});
+```
+
+### `convertToMarkdownDetailed(input, options?)`
+
+Same conversion as `convertToMarkdown` (`markdown` is identical), plus a report of what happened:
+
+```typescript
+import { convertToMarkdownDetailed } from "@cognipeer/to-markdown";
+
+const { markdown, pages, images, warnings, stats } = await convertToMarkdownDetailed("./mixed.pdf", {
+  ocr: { pdfMode: "auto-page", lang: "tr+en" },
+});
+
+// pages: [{ page: 1, source: 'text', chars: 412 },
+//         { page: 2, source: 'ocr', chars: 380, reason: 'no-text', ms: 540 }, ...]
+// stats: { pageCount, ocrCalls, ocrPages, ocrImages, ocrMs, renderMs }
+// warnings: ['ocr_page_failed: page 3: ...', 'ocr_page_limit: ...', 'ocr_timeout: page 4', ...]
+```
+
+`pages[].source` is `text`, `ocr`, `empty`, `error` or `skipped`. `images[]` lists embedded and standalone
+images with their size, whether OCR produced text and why one was skipped (`small`, `duplicate`, `limit`).
+
+### OCR Guide (3.6)
+
+**Per-page OCR for mixed PDFs (`pdfMode: 'auto-page'`).** `auto` (the default) OCRs the whole document only when
+the text layer is empty, so a PDF that mixes native pages with scanned pages loses the scans. `auto-page` checks
+every page and OCRs just the ones that need it:
+
+- no text at all (`no-text`);
+- a garbled text layer, i.e. more than `pageTrigger.maxGarbledRatio` (0.3) replacement or private-use characters (`garbled`);
+- fewer than `pageTrigger.minChars` (32) non-whitespace characters **and** a raster image on the page (`low-text`,
+  typical for scans with a stamp or page number; set `requireImage: false` to drop the image requirement).
+
+OCR text replaces the page's text layer; pages that were fine keep their native text, and page order is preserved.
+`maxPages` caps the number of OCRed pages (the rest are reported as `skipped` with an `ocr_page_limit` warning).
+A failed page keeps its native text and is reported as `error`; set `onError: 'throw'` to fail, or `'comment'` to
+leave `<!-- OCR failed (page N): ... -->`. If every page needed OCR and nothing succeeded, the conversion throws
+`PDF OCR failed: ...` like the legacy modes.
+
+```typescript
+const md = await convertToMarkdown("./mixed.pdf", {
+  ocr: {
+    pdfMode: "auto-page",
+    lang: "tr+en",
+    concurrency: 2,
+    render: { scale: 2, maxPixels: 20_000_000, grayscale: true },
+    onProgress: ({ completed, total }) => console.log(`${completed}/${total}`),
+  },
+});
+```
+
+**Handlers and `documentHandler`.** With `provider: 'handler'` you run the OCR yourself. The handler may return a
+string or an object `{ text, markdown?, confidence? }`; `markdown` is preferred over `text` when present. The context
+carries `kind` (`pdf-page`, `image`, `tiff-page`, `embedded-image`), `page`, `pageCount`, `index`, `sourcePath`,
+`slide`, `mimeType`, `imageWidth`, `imageHeight`, `langHint` (ISO codes) and `signal`. To OCR the whole PDF with one
+call (for example with a document-level OCR service), pass `documentHandler`; it receives the PDF buffer and the
+candidate pages and returns `[{ page, text, markdown? }]`. No pages are rendered in that case.
+
+```typescript
+const md = await convertToMarkdown("./scan.pdf", {
+  ocr: {
+    provider: "handler",
+    pdfMode: "auto-page",
+    handler: async (png, ctx) => ({ text: await myOcr(png, ctx.langHint), confidence: 0.93 }),
+    // or, one call for the whole document:
+    // documentHandler: async (pdf, { pages }) => myDocumentOcr(pdf, pages),
+  },
+});
+```
+
+**Tesseract: offline, `langPath`, language mapping.** One Tesseract worker is created per conversion and reused for
+all pages and images (`concurrency > 1` uses up to 4 workers). Language data is normally downloaded on first use;
+for servers without internet, point `langPath` at a directory containing `<lang>.traineddata.gz` and set
+`offline: true`. Nothing is downloaded or written to the working directory, and a missing language file fails fast
+(`tesseract_lang_missing`). `lang` accepts ISO 639-1 codes: `'tr+en'` becomes `'tur+eng'` (see also the exported
+`toTesseractLang`). Other settings: `cachePath`, `psm`, `oem`, `gzip` (set `false` for uncompressed `.traineddata`).
+
+```typescript
+const md = await convertToMarkdown("./scan.pdf", {
+  ocr: {
+    lang: "tr+en",
+    pdfMode: "auto-page",
+    tesseract: { offline: true, langPath: "/opt/tessdata", psm: 6 },
+  },
+});
+```
+
+**Timeouts, abort and errors.** `timeoutMs` limits one OCR task (a timeout counts as a failure and adds an
+`ocr_timeout` warning). Pass `signal` to cancel: the conversion rejects with the signal's reason (an `AbortError`),
+and abort is never swallowed by `onError`. `onError` is `'comment'` (default for image files: `<!-- OCR failed: msg -->`),
+`'skip'` (default for `auto-page` and embedded images) or `'throw'`. VLM providers retry HTTP 429/5xx and network
+errors (`vlm.retries`, default 2, with 1 s / 2 s backoff and `Retry-After` up to 30 s) and send the real image type.
+
+**TIFF, WEBP and BMP.** `.tif`, `.tiff`, `.webp` and `.bmp` are now treated as images. (Before 3.6 they were decoded
+as text, which produced garbage.) Multi-page TIFFs get a `Pages: N` header line and, with OCR, every frame is
+recognised and the texts are joined under one `## Extracted Text`. Images with an EXIF orientation are rotated
+before OCR (`autoRotate: false` disables it). `imageMetadata: false` removes the `ImageSize:` / `Format:` header.
+
+**Images embedded in documents.** `images` controls how DOCX, HTML, EPUB and PPTX render images:
+
+- `'inline'` (default): exactly the 3.5.0 output (DOCX/HTML data URIs);
+- `'placeholder'`: `![alt](image-1.png)` references instead of base64 data, keeping the alt text;
+- `'omit'`: images are dropped.
+
+`ocr.embeddedImages` additionally runs OCR on embedded images of DOCX, PPTX and HTML (`data:` images only; URLs are
+never fetched) and inserts the text as a blockquote right after the image. Images smaller than 64x64 are skipped,
+identical images are OCRed once, and at most 50 images per document are processed (tune with
+`{ minWidth, minHeight, maxImages, dedupe }`). EPUB images are not OCRed in 3.6.
+
+```typescript
+const md = await convertToMarkdown("./report.docx", {
+  images: "placeholder",
+  ocr: { provider: "tesseract", lang: "tr+en", embeddedImages: true },
 });
 ```
 

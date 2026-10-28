@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-10-28
+
+### Added
+
+- Per-page PDF OCR: `ocr.pdfMode: 'auto-page'` OCRs only the pages whose text
+  layer is missing, garbled or too short (a scan with a stamp), keeps the
+  native text of the other pages and preserves page order. Tune it with
+  `pageTrigger` (`minChars`, `maxGarbledRatio`, `requireImage`).
+- `convertToMarkdownDetailed(input, options?)`: the same Markdown plus a report
+  (per-page source and reason, per-image results, warnings, OCR/render timings).
+- OCR handler results can be objects (`{ text, markdown?, confidence? }`);
+  handler context gained `kind`, `index`, `sourcePath`, `slide`, `langHint` and
+  `signal`. `ocr.documentHandler` OCRs a whole PDF in one call.
+- OCR pipeline controls: `render` (scale, `maxPixels`, jpeg, grayscale),
+  `maxPages`, `concurrency`, `timeoutMs`, `signal` (abort), `onProgress` and
+  `onError` (`comment` / `skip` / `throw`).
+- Tesseract: one reusable worker per conversion (up to 4 with `concurrency`),
+  `tesseract.langPath`, `cachePath`, `offline` (never downloads or writes
+  language data), `psm`, `oem`, `gzip`; ISO 639-1 language codes (`'tr+en'`)
+  and the exported `toTesseractLang()` helper.
+- VLM providers: real media type, conversion of unsupported formats to PNG,
+  retries with backoff (`vlm.retries`, `Retry-After`) and `vlm.timeoutMs`.
+- Embedded images in DOCX, PPTX, HTML and EPUB: `images: 'placeholder' | 'omit'`
+  and OCR of embedded images with `ocr.embeddedImages` (size filter, dedupe,
+  `maxImages`). EPUB images are not OCRed yet.
+- Multi-page TIFF support (`Pages: N` header, per-frame OCR), EXIF
+  auto-rotation before image OCR (`ocr.autoRotate`) and `imageMetadata: false`.
+- `FileExtension.TIF`, `TIFF`, `WEBP` and `BMP`.
+- `benchmark/ocr/run.ts` and an opt-in real Tesseract test
+  (`TM_TEST_TESSERACT=1`, `TM_TESSDATA_DIR`); neither is part of `npm test`.
+
+### Fixed
+
+- `.tif`, `.tiff`, `.webp` and `.bmp` files were decoded as UTF-8 text and
+  produced garbage; they are now handled as images.
+- PPTX conversion wrote a temporary file into the working directory; the
+  archive is now read from memory.
+
+### Notes
+
+- No breaking changes; defaults unchanged. With the options 3.5.0 knew
+  (including `ocr: true` and the legacy `pdfMode` values) the output is
+  byte-identical to 3.5.0, which a golden-output test enforces. Public types
+  only gained optional members and `OCRHandler` may still return a string.
+
 ## [3.5.0] - 2026-10-21
 
 ### Fixed
