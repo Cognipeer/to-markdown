@@ -2,7 +2,10 @@ import { imageDimensionsFromData } from 'image-dimensions';
 import { lookup } from 'mime-types';
 import { parseBuffer } from 'music-metadata';
 import { formatMarkdown } from '../utils/markdown.js';
-import type { OCROptions } from '../types/index.js';
+import type { ImageReport, OCROptions } from '../types/index.js';
+import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
+import { countChars } from '../utils/chars.js';
+import { OcrTimeoutError, runOcrTasks } from '../utils/ocrRunner.js';
 
 function imageMimeType(
   ext: string,
@@ -35,12 +38,33 @@ function imageMimeType(
  * @param ext      - File extension
  * @param ocr      - OCR option (opt-in, default off)
  * @param fileName - Original file name from ConverterOptions, when provided
+ * @param ctx      - Conversion context (reports, warnings, shared OCR engine); internal
  */
 export async function convertImageToMarkdown(
   buffer: Buffer,
   ext: string,
   ocr?: boolean | OCROptions,
-  fileName?: string
+  fileName?: string,
+  ctx?: ConversionContext
+): Promise<string> {
+  return withConversionContext(ctx, { ocr }, (conv) =>
+    convertImage(buffer, ext, ocr, fileName, conv)
+  );
+}
+
+/** Wraps an error that must leave `convertImage` unchanged (no "Failed to convert image" prefix). */
+class PassThroughError extends Error {
+  constructor(public readonly original: unknown) {
+    super('pass-through');
+  }
+}
+
+async function convertImage(
+  buffer: Buffer,
+  ext: string,
+  ocr: boolean | OCROptions | undefined,
+  fileName: string | undefined,
+  conv: ConversionContext
 ): Promise<string> {
   try {
     const measured = imageDimensionsFromData(buffer);
@@ -66,26 +90,74 @@ export async function convertImageToMarkdown(
       md += `Format: ${dimensions.type}\n`;
     }
 
+    const report: ImageReport = {
+      index: 0,
+      kind: 'image',
+      width: dimensions.width,
+      height: dimensions.height,
+      ocr: false,
+    };
+    if (fileName) report.path = fileName;
+    conv.images.push(report);
+
     // OCR — opt-in only
     if (ocr) {
+      const ocrOpts: OCROptions = typeof ocr === 'object' ? ocr : {};
       try {
-        const { ocrImage } = await import('../utils/ocr.js');
-        const ocrOpts: OCROptions = typeof ocr === 'object' ? ocr : {};
-        const text = await ocrImage(buffer, ocrOpts, {
-          mimeType: imageMimeType(ext, fileName, dimensions.type),
-          sourceExtension: ext,
-          fileName,
-          imageWidth: dimensions.width,
-          imageHeight: dimensions.height,
-        });
-        if (text) md += `\n\n## Extracted Text\n\n${text}\n`;
+        const { ocrImageDetailed } = await import('../utils/ocr.js');
+        const mimeType = imageMimeType(ext, fileName, dimensions.type);
+        const [outcome] = await runOcrTasks(
+          [
+            {
+              run: (signal) =>
+                ocrImageDetailed(
+                  buffer,
+                  ocrOpts,
+                  {
+                    mimeType,
+                    sourceExtension: ext,
+                    fileName,
+                    imageWidth: dimensions.width,
+                    imageHeight: dimensions.height,
+                    kind: 'image',
+                    index: 0,
+                    ...(signal ? { signal } : {}),
+                  },
+                  conv
+                ),
+            },
+          ],
+          {
+            timeoutMs: ocrOpts.timeoutMs,
+            signal: conv.signal,
+            onProgress: ocrOpts.onProgress,
+            kind: 'image',
+          }
+        );
+        if (outcome.status === 'error') throw outcome.error;
+        if (outcome.status === 'ok') {
+          const text = outcome.value.markdown ?? outcome.value.text;
+          if (text) {
+            md += `\n\n## Extracted Text\n\n${text}\n`;
+            report.ocr = true;
+            report.chars = countChars(text);
+          }
+        }
       } catch (ocrErr: any) {
-        md += `\n\n<!-- OCR failed: ${ocrErr.message} -->\n`;
+        // Cancellation is never swallowed by `onError`.
+        if (conv.signal && conv.signal.aborted) throw new PassThroughError(ocrErr);
+        report.error = ocrErr.message;
+        if (ocrErr instanceof OcrTimeoutError) conv.warn('ocr_timeout', fileName ?? 'image');
+        else conv.warn('ocr_image_failed', `${fileName ?? 'image'}: ${ocrErr.message}`);
+        const onError = ocrOpts.onError ?? 'comment';
+        if (onError === 'throw') throw new PassThroughError(ocrErr);
+        if (onError === 'comment') md += `\n\n<!-- OCR failed: ${ocrErr.message} -->\n`;
       }
     }
 
     return formatMarkdown(md);
   } catch (err: any) {
+    if (err instanceof PassThroughError) throw err.original;
     throw new Error(`Failed to convert image: ${err.message}`);
   }
 }

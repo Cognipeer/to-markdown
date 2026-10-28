@@ -1,12 +1,18 @@
 import AdmZip from 'adm-zip';
 import { parseStringPromise } from 'xml2js';
 import { convertHtmlToMarkdown } from './html.js';
+import type { ConverterOptions } from '../types/index.js';
+import type { ConversionContext } from '../utils/conversionContext.js';
 
 /**
  * Converts an EPUB buffer to Markdown.
  * EPUB is a ZIP containing HTML/XHTML content files described by an OPF manifest.
  */
-export async function convertEpubToMarkdown(buffer: Buffer): Promise<string> {
+export async function convertEpubToMarkdown(
+  buffer: Buffer,
+  _options?: ConverterOptions,
+  _ctx?: ConversionContext
+): Promise<string> {
   try {
     const zip = new AdmZip(buffer);
 

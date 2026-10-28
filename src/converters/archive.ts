@@ -6,13 +6,18 @@ import { formatMarkdown } from '../utils/markdown.js';
 import { convertHtmlToMarkdown } from './html.js';
 import { convertCsvToMarkdown } from './spreadsheet.js';
 import type { ConverterOptions } from '../types/index.js';
+import type { ConversionContext } from '../utils/conversionContext.js';
 
 /**
  * Converts PowerPoint buffer to Markdown
  * @param buffer - PPTX file buffer
  * @returns Markdown string
  */
-export async function convertPptxToMarkdown(buffer: Buffer): Promise<string> {
+export async function convertPptxToMarkdown(
+  buffer: Buffer,
+  _options?: ConverterOptions,
+  _ctx?: ConversionContext
+): Promise<string> {
   try {
     const tempPath = join(process.cwd(), 'temp_pptx_' + Date.now() + '.zip');
     writeFileSync(tempPath, buffer);
@@ -73,7 +78,8 @@ async function extractTextFromSlideXml(xml: string): Promise<string> {
  */
 export async function convertZipToMarkdown(
   buffer: Buffer,
-  options: ConverterOptions
+  options: ConverterOptions,
+  _ctx?: ConversionContext
 ): Promise<string> {
   try {
     const zip = new AdmZip(buffer);

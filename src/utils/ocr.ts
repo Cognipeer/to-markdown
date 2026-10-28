@@ -1,10 +1,19 @@
 import type { OCRHandlerContext, OCROptions, VLMOptions } from '../types/index.js';
+import type { ConversionContext } from './conversionContext.js';
+import { fetchWithRetry } from './http.js';
+import { prepareImageForVlm } from './imageTranscode.js';
+import { toIsoLangList } from './lang.js';
+import { normalizeHandlerResult, type NormalizedOcrResult } from './ocrRunner.js';
+import { TesseractSession } from './tesseract.js';
 
 const DEFAULT_OCR_PROMPT =
   'Extract all text from this image exactly as it appears. Return only the extracted text, preserving the original layout and line breaks as closely as possible.';
 
 /**
  * Extracts text from an image buffer using the configured OCR provider.
+ *
+ * With a handler that returns `{ text, markdown }` the markdown rendering is
+ * returned when present. Use `convertToMarkdownDetailed` for reports and stats.
  *
  * @param buffer  - Image buffer (PNG, JPEG, etc.)
  * @param opts    - OCR options including provider selection and provider-specific config
@@ -15,28 +24,64 @@ export async function ocrImage(
   opts: OCROptions = {},
   context: OCRHandlerContext = {}
 ): Promise<string> {
-  const provider = opts.provider ?? 'tesseract';
+  const result = await ocrImageDetailed(buffer, opts, context);
+  return result.markdown ?? result.text;
+}
 
-  switch (provider) {
-    case 'tesseract':
-      return ocrWithTesseract(buffer, opts);
-    case 'openai-vlm':
-      return ocrWithOpenAI(buffer, requireVlm(opts, 'openai-vlm'));
-    case 'anthropic-vlm':
-      return ocrWithAnthropic(buffer, requireVlm(opts, 'anthropic-vlm'));
-    case 'ollama-vlm':
-      return ocrWithOllama(buffer, requireVlm(opts, 'ollama-vlm'));
-    case 'azure-vision':
-      return ocrWithAzureVision(buffer, requireVlm(opts, 'azure-vision'));
-    case 'custom-vlm':
-      return ocrWithOpenAI(buffer, requireVlm(opts, 'custom-vlm'));
-    case 'handler':
-      return ocrWithHandler(buffer, opts, context);
-    default: {
-      // Exhaustiveness check — TypeScript will catch unknown providers at compile time
-      const _never: never = provider;
-      throw new Error(`Unknown OCR provider: ${_never}`);
+/**
+ * Internal variant of {@link ocrImage}: returns text, markdown and confidence and
+ * records stats / reuses the tesseract session of a conversion when `conversion`
+ * is given. Without one it behaves like the standalone `ocrImage()` (its own
+ * worker, terminated afterwards).
+ */
+export async function ocrImageDetailed(
+  buffer: Buffer,
+  opts: OCROptions = {},
+  context: OCRHandlerContext = {},
+  conversion?: ConversionContext
+): Promise<NormalizedOcrResult> {
+  const provider = opts.provider ?? 'tesseract';
+  const signal = context.signal ?? conversion?.signal;
+  const started = Date.now();
+  if (conversion) conversion.stats.ocrCalls++;
+
+  try {
+    let result: NormalizedOcrResult;
+    switch (provider) {
+      case 'tesseract':
+        result = await ocrWithTesseract(buffer, opts, signal, conversion);
+        break;
+      case 'openai-vlm':
+        result = { text: await ocrWithOpenAI(buffer, requireVlm(opts, 'openai-vlm'), context, signal) };
+        break;
+      case 'anthropic-vlm':
+        result = { text: await ocrWithAnthropic(buffer, requireVlm(opts, 'anthropic-vlm'), context, signal) };
+        break;
+      case 'ollama-vlm':
+        result = { text: await ocrWithOllama(buffer, requireVlm(opts, 'ollama-vlm'), context, signal) };
+        break;
+      case 'azure-vision':
+        result = { text: await ocrWithAzureVision(buffer, requireVlm(opts, 'azure-vision'), signal) };
+        break;
+      case 'custom-vlm':
+        result = { text: await ocrWithOpenAI(buffer, requireVlm(opts, 'custom-vlm'), context, signal) };
+        break;
+      case 'handler':
+        result = await ocrWithHandler(buffer, opts, context, signal);
+        break;
+      default: {
+        // Exhaustiveness check — TypeScript will catch unknown providers at compile time
+        const _never: never = provider;
+        throw new Error(`Unknown OCR provider: ${_never}`);
+      }
     }
+    if (conversion) {
+      if (context.kind === 'pdf-page' || context.kind === 'tiff-page') conversion.stats.ocrPages++;
+      else if (context.kind === 'image' || context.kind === 'embedded-image') conversion.stats.ocrImages++;
+    }
+    return result;
+  } finally {
+    if (conversion) conversion.stats.ocrMs += Date.now() - started;
   }
 }
 
@@ -45,13 +90,23 @@ export async function ocrImage(
 async function ocrWithHandler(
   buffer: Buffer,
   opts: OCROptions,
-  context: OCRHandlerContext
-): Promise<string> {
+  context: OCRHandlerContext,
+  signal: AbortSignal | undefined
+): Promise<NormalizedOcrResult> {
   if (!opts.handler) {
     throw new Error("OCR provider 'handler' requires opts.handler");
   }
-  const text = await opts.handler(buffer, context);
-  return (text ?? '').trim();
+  const handlerContext: OCRHandlerContext = { ...context };
+  if (handlerContext.langHint === undefined) {
+    const hint = toIsoLangList(opts.lang);
+    if (hint) handlerContext.langHint = hint;
+  }
+  if (handlerContext.signal === undefined && signal) handlerContext.signal = signal;
+  return normalizeHandlerResult(await opts.handler(buffer, handlerContext));
+}
+
+function vlmRetryOptions(vlm: VLMOptions, signal: AbortSignal | undefined) {
+  return { retries: vlm.retries, timeoutMs: vlm.timeoutMs, signal };
 }
 
 function requireVlm(opts: OCROptions, provider: string): VLMOptions {
@@ -63,41 +118,42 @@ function requireVlm(opts: OCROptions, provider: string): VLMOptions {
 
 // ── Tesseract ─────────────────────────────────────────────────────────────
 
-async function ocrWithTesseract(buffer: Buffer, opts: OCROptions): Promise<string> {
-  const { lang = 'eng' } = opts;
-
-  let createWorker: (lang: string) => Promise<any>;
-  try {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const tesseract = await import('tesseract.js');
-    createWorker = tesseract.createWorker;
-  } catch {
-    throw new Error(
-      "OCR with 'tesseract' provider requires tesseract.js: npm install tesseract.js"
-    );
+async function ocrWithTesseract(
+  buffer: Buffer,
+  opts: OCROptions,
+  signal: AbortSignal | undefined,
+  conversion: ConversionContext | undefined
+): Promise<NormalizedOcrResult> {
+  if (conversion) {
+    // One engine per conversion, terminated by the conversion's `finally`.
+    return conversion.getTesseract(opts).recognize(buffer, signal);
   }
-
-  const worker = await createWorker(lang);
+  // Standalone call: own worker, terminated right away (as in 3.5.0).
+  const session = new TesseractSession(opts);
   try {
-    const { data } = await worker.recognize(buffer);
-    return (data.text ?? '').trim();
+    return await session.recognize(buffer, signal);
   } finally {
-    await worker.terminate();
+    await session.terminate();
   }
 }
 
 // ── OpenAI Vision (also used by custom-vlm) ───────────────────────────────
 
-async function ocrWithOpenAI(buffer: Buffer, vlm: VLMOptions): Promise<string> {
+async function ocrWithOpenAI(
+  buffer: Buffer,
+  vlm: VLMOptions,
+  context: OCRHandlerContext,
+  signal: AbortSignal | undefined
+): Promise<string> {
   if (!vlm.model) throw new Error("openai-vlm/custom-vlm: vlm.model is required");
   if (!vlm.apiKey) throw new Error("openai-vlm/custom-vlm: vlm.apiKey is required");
 
   const apiBase = (vlm.apiBase ?? 'https://api.openai.com/v1').replace(/\/$/, '');
   const prompt  = vlm.prompt ?? DEFAULT_OCR_PROMPT;
-  const base64  = buffer.toString('base64');
+  const image   = await prepareImageForVlm(buffer, context.mimeType);
+  const base64  = image.buffer.toString('base64');
 
-  const response = await fetch(`${apiBase}/chat/completions`, {
+  const response = await fetchWithRetry(`${apiBase}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -111,12 +167,12 @@ async function ocrWithOpenAI(buffer: Buffer, vlm: VLMOptions): Promise<string> {
           role: 'user',
           content: [
             { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: `data:image/png;base64,${base64}` } },
+            { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${base64}` } },
           ],
         },
       ],
     }),
-  });
+  }, vlmRetryOptions(vlm, signal));
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -129,15 +185,21 @@ async function ocrWithOpenAI(buffer: Buffer, vlm: VLMOptions): Promise<string> {
 
 // ── Anthropic Vision ──────────────────────────────────────────────────────
 
-async function ocrWithAnthropic(buffer: Buffer, vlm: VLMOptions): Promise<string> {
+async function ocrWithAnthropic(
+  buffer: Buffer,
+  vlm: VLMOptions,
+  context: OCRHandlerContext,
+  signal: AbortSignal | undefined
+): Promise<string> {
   if (!vlm.model) throw new Error("anthropic-vlm: vlm.model is required");
   if (!vlm.apiKey) throw new Error("anthropic-vlm: vlm.apiKey is required");
 
   const apiBase = (vlm.apiBase ?? 'https://api.anthropic.com').replace(/\/$/, '');
   const prompt  = vlm.prompt ?? DEFAULT_OCR_PROMPT;
-  const base64  = buffer.toString('base64');
+  const image   = await prepareImageForVlm(buffer, context.mimeType);
+  const base64  = image.buffer.toString('base64');
 
-  const response = await fetch(`${apiBase}/v1/messages`, {
+  const response = await fetchWithRetry(`${apiBase}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -153,14 +215,14 @@ async function ocrWithAnthropic(buffer: Buffer, vlm: VLMOptions): Promise<string
           content: [
             {
               type: 'image',
-              source: { type: 'base64', media_type: 'image/png', data: base64 },
+              source: { type: 'base64', media_type: image.mimeType, data: base64 },
             },
             { type: 'text', text: prompt },
           ],
         },
       ],
     }),
-  });
+  }, vlmRetryOptions(vlm, signal));
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -173,14 +235,20 @@ async function ocrWithAnthropic(buffer: Buffer, vlm: VLMOptions): Promise<string
 
 // ── Ollama Vision ─────────────────────────────────────────────────────────
 
-async function ocrWithOllama(buffer: Buffer, vlm: VLMOptions): Promise<string> {
+async function ocrWithOllama(
+  buffer: Buffer,
+  vlm: VLMOptions,
+  context: OCRHandlerContext,
+  signal: AbortSignal | undefined
+): Promise<string> {
   if (!vlm.model) throw new Error("ollama-vlm: vlm.model is required");
 
   const apiBase = (vlm.apiBase ?? 'http://localhost:11434').replace(/\/$/, '');
   const prompt  = vlm.prompt ?? DEFAULT_OCR_PROMPT;
-  const base64  = buffer.toString('base64');
+  const image   = await prepareImageForVlm(buffer, context.mimeType);
+  const base64  = image.buffer.toString('base64');
 
-  const response = await fetch(`${apiBase}/api/chat`, {
+  const response = await fetchWithRetry(`${apiBase}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -194,7 +262,7 @@ async function ocrWithOllama(buffer: Buffer, vlm: VLMOptions): Promise<string> {
         },
       ],
     }),
-  });
+  }, vlmRetryOptions(vlm, signal));
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -207,13 +275,17 @@ async function ocrWithOllama(buffer: Buffer, vlm: VLMOptions): Promise<string> {
 
 // ── Azure Computer Vision ─────────────────────────────────────────────────
 
-async function ocrWithAzureVision(buffer: Buffer, vlm: VLMOptions): Promise<string> {
+async function ocrWithAzureVision(
+  buffer: Buffer,
+  vlm: VLMOptions,
+  signal: AbortSignal | undefined
+): Promise<string> {
   if (!vlm.apiKey)  throw new Error("azure-vision: vlm.apiKey is required");
   if (!vlm.apiBase) throw new Error("azure-vision: vlm.apiBase (Azure endpoint URL) is required");
 
   const endpoint = vlm.apiBase.replace(/\/$/, '');
 
-  const response = await fetch(
+  const response = await fetchWithRetry(
     `${endpoint}/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=read`,
     {
       method: 'POST',
@@ -222,7 +294,8 @@ async function ocrWithAzureVision(buffer: Buffer, vlm: VLMOptions): Promise<stri
         'Ocp-Apim-Subscription-Key': vlm.apiKey,
       },
       body: buffer,
-    }
+    },
+    vlmRetryOptions(vlm, signal)
   );
 
   if (!response.ok) {

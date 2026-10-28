@@ -1,5 +1,8 @@
 import { loadPdf } from '../utils/pdfjs.js';
-import type { OCROptions } from '../types/index.js';
+import type { OCROptions, PageReport } from '../types/index.js';
+import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
+import { countChars } from '../utils/chars.js';
+import { runOcrTasks } from '../utils/ocrRunner.js';
 
 // ── Constants (ported from MarkItDown _pdf_converter.py) ─────────────────
 const PARTIAL_NUMBERING_RE = /^\.\d+$/;
@@ -310,14 +313,28 @@ function extractFormContentFromWords(words: PDFWord[], pageWidth: number): strin
 export async function convertPdfToMarkdown(
   buffer: Buffer,
   ocr?: boolean | OCROptions,
-  fileName?: string
+  fileName?: string,
+  ctx?: ConversionContext
+): Promise<string> {
+  return withConversionContext(ctx, { ocr }, (conv) => convertPdf(buffer, ocr, fileName, conv));
+}
+
+async function convertPdf(
+  buffer: Buffer,
+  ocr: boolean | OCROptions | undefined,
+  fileName: string | undefined,
+  conv: ConversionContext
 ): Promise<string> {
   const pdf = await loadPdf(buffer);
+  const numPages = pdf.numPages;
+  conv.stats.pageCount = numPages;
 
   const markdownChunks: string[] = [];
+  const pageTexts: string[] = new Array(numPages).fill('');
+  const pageErrors: Array<string | undefined> = new Array(numPages).fill(undefined);
   let formPageCount = 0;
 
-  for (let p = 1; p <= pdf.numPages; p++) {
+  for (let p = 1; p <= numPages; p++) {
     try {
       const page = await pdf.getPage(p);
       const { words, pageWidth } = await extractPageWords(page);
@@ -326,16 +343,23 @@ export async function convertPdfToMarkdown(
 
       if (formContent !== null) {
         formPageCount++;
-        if (formContent.trim()) markdownChunks.push(formContent.trim());
+        if (formContent.trim()) {
+          markdownChunks.push(formContent.trim());
+          pageTexts[p - 1] = formContent.trim();
+        }
       } else {
         // Plain-text fallback for non-structured pages
         const text = await extractPagePlainText(page);
-        if (text) markdownChunks.push(text);
+        if (text) {
+          markdownChunks.push(text);
+          pageTexts[p - 1] = text;
+        }
       }
 
       page.cleanup(); // Free cached page data (mirrors pdfplumber page.close())
-    } catch {
+    } catch (err: any) {
       // Skip unreadable pages silently
+      pageErrors[p - 1] = err?.message ?? String(err);
     }
   }
 
@@ -344,13 +368,18 @@ export async function convertPdfToMarkdown(
   let markdown: string;
   if (formPageCount === 0) {
     const plainChunks: string[] = [];
-    for (let p = 1; p <= pdf.numPages; p++) {
+    for (let p = 1; p <= numPages; p++) {
       try {
         const page = await pdf.getPage(p);
         const text = await extractPagePlainText(page);
         if (text) plainChunks.push(text);
+        pageTexts[p - 1] = text || '';
+        pageErrors[p - 1] = undefined;
         page.cleanup();
-      } catch { /* skip */ }
+      } catch (err: any) {
+        /* skip */
+        pageErrors[p - 1] = err?.message ?? String(err);
+      }
     }
     markdown = plainChunks.join('\n\n');
   } else {
@@ -359,36 +388,115 @@ export async function convertPdfToMarkdown(
 
   const extractedText = mergePartialNumberingLines(markdown);
 
+  const textReports = (): PageReport[] =>
+    pageTexts.map((text, i) => {
+      const chars = countChars(text);
+      const report: PageReport = { page: i + 1, source: chars > 0 ? 'text' : 'empty', chars };
+      if (pageErrors[i] !== undefined && chars === 0) {
+        report.source = 'error';
+        report.error = pageErrors[i];
+      }
+      return report;
+    });
+  conv.pages = textReports();
+
   // ── OCR integration (opt-in) ─────────────────────────────────────────────
   if (ocr) {
     const ocrOpts: OCROptions = typeof ocr === 'object' ? ocr : {};
     const ocrMode = ocrOpts.pdfMode ?? 'auto';
+    // 'auto-page' behaves like 'auto' until per-page OCR lands (TM-2).
     const shouldOcr =
       ocrMode === 'always' ||
-      (ocrMode === 'auto' && !extractedText.trim());
+      ((ocrMode === 'auto' || ocrMode === 'auto-page') && !extractedText.trim());
 
     if (shouldOcr) {
       try {
         const { renderPdfPageToPng } = await import('../utils/pdfRender.js');
-        const { ocrImage } = await import('../utils/ocr.js');
+        const { ocrImageDetailed } = await import('../utils/ocr.js');
         const pdf2 = await loadPdf(buffer);
-        const ocrTexts: string[] = [];
-        for (let p = 1; p <= pdf2.numPages; p++) {
-          let png: Buffer;
-          try {
-            png = await renderPdfPageToPng(buffer, p);
-          } catch { /* skip unrenderable pages */ continue; }
-          const text = await ocrImage(png, ocrOpts, {
+        const pageCount = pdf2.numPages;
+        const renderErrors: Array<string | undefined> = new Array(pageCount).fill(undefined);
+        const tasks = Array.from({ length: pageCount }, (_, i) => {
+          const p = i + 1;
+          return {
             page: p,
-            pageCount: pdf2.numPages,
-            mimeType: 'image/png',
-            sourceExtension: '.pdf',
-            fileName,
-          }); // API errors propagate to outer catch
-          if (text) ocrTexts.push(text);
+            run: async (signal: AbortSignal | undefined) => {
+              let png: Buffer;
+              const renderStart = Date.now();
+              try {
+                png = await renderPdfPageToPng(buffer, p);
+              } catch (err: any) {
+                /* skip unrenderable pages */
+                renderErrors[i] = err?.message ?? String(err);
+                return null;
+              } finally {
+                conv.stats.renderMs += Date.now() - renderStart;
+              }
+              return ocrImageDetailed(
+                png,
+                ocrOpts,
+                {
+                  page: p,
+                  pageCount,
+                  mimeType: 'image/png',
+                  sourceExtension: '.pdf',
+                  fileName,
+                  kind: 'pdf-page',
+                  ...(signal ? { signal } : {}),
+                },
+                conv
+              ); // API errors propagate to outer catch
+            },
+          };
+        });
+
+        const outcomes = await runOcrTasks(tasks, {
+          concurrency: ocrOpts.concurrency,
+          timeoutMs: ocrOpts.timeoutMs,
+          signal: conv.signal,
+          onProgress: ocrOpts.onProgress,
+          kind: 'pdf-page',
+          stopOnError: true,
+        });
+
+        const ocrTexts: string[] = [];
+        const reports: PageReport[] = [];
+        for (let i = 0; i < outcomes.length; i++) {
+          const outcome = outcomes[i];
+          const page = i + 1;
+          if (outcome.status === 'error') {
+            conv.warn(
+              outcome.timedOut ? 'ocr_timeout' : 'ocr_page_failed',
+              outcome.timedOut ? `page ${page}` : `page ${page}: ${outcome.error.message}`
+            );
+            throw outcome.error;
+          }
+          if (outcome.status === 'skipped') continue;
+          if (outcome.value === null) {
+            reports.push({ page, source: 'error', chars: 0, error: renderErrors[i] });
+            continue;
+          }
+          const text = outcome.value.markdown ?? outcome.value.text;
+          if (text) {
+            ocrTexts.push(text);
+            reports.push({
+              page,
+              source: 'ocr',
+              chars: countChars(text),
+              reason: ocrMode === 'always' ? 'always' : 'auto',
+              ms: outcome.ms,
+            });
+          } else {
+            reports.push({ page, source: 'empty', chars: 0, reason: ocrMode === 'always' ? 'always' : 'auto', ms: outcome.ms });
+          }
         }
-        if (ocrTexts.length > 0) return ocrTexts.join('\n\n');
+        if (ocrTexts.length > 0) {
+          conv.pages = reports;
+          return ocrTexts.join('\n\n');
+        }
       } catch (err: any) {
+        // Cancellation is never swallowed by the text fallback.
+        if (conv.signal && conv.signal.aborted) throw err;
         if (!extractedText.trim()) {
           throw new Error(`PDF OCR failed: ${err.message}`);
         }
