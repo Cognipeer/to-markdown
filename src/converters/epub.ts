@@ -1,18 +1,39 @@
 import AdmZip from 'adm-zip';
 import { parseStringPromise } from 'xml2js';
-import { convertHtmlToMarkdown } from './html.js';
+import { convertHtmlToMarkdown, convertHtmlWithSession } from './html.js';
 import type { ConverterOptions } from '../types/index.js';
-import type { ConversionContext } from '../utils/conversionContext.js';
+import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
+import { EmbeddedImageSession, resolveEmbeddedImagePolicy } from '../utils/embeddedImages.js';
 
 /**
  * Converts an EPUB buffer to Markdown.
  * EPUB is a ZIP containing HTML/XHTML content files described by an OPF manifest.
+ *
+ * `options.images` (`'placeholder'` / `'omit'`) is applied to the chapters' images.
+ * OCR of EPUB images is not supported: `ocr.embeddedImages` is ignored (with a warning).
  */
 export async function convertEpubToMarkdown(
   buffer: Buffer,
-  _options?: ConverterOptions,
-  _ctx?: ConversionContext
+  options?: ConverterOptions,
+  ctx?: ConversionContext
 ): Promise<string> {
+  // OCR of EPUB images is out of scope: the policy never carries OCR options.
+  const policy = resolveEmbeddedImagePolicy(options, false);
+  if (!policy) {
+    if (ctx && ctx.ocr?.embeddedImages) {
+      ctx.warn('embedded_image_ocr_unsupported', 'EPUB images are not OCRed');
+    }
+    return convertEpub(buffer);
+  }
+  return withConversionContext(ctx, options ?? {}, (conv) => {
+    if (conv.ocr?.embeddedImages) {
+      conv.warn('embedded_image_ocr_unsupported', 'EPUB images are not OCRed');
+    }
+    return convertEpub(buffer, new EmbeddedImageSession(conv, policy));
+  });
+}
+
+async function convertEpub(buffer: Buffer, session?: EmbeddedImageSession): Promise<string> {
   try {
     const zip = new AdmZip(buffer);
 
@@ -73,7 +94,10 @@ export async function convertEpubToMarkdown(
       if (!entry) continue;
 
       const html = entry.getData().toString('utf-8');
-      const converted = convertHtmlToMarkdown(Buffer.from(html, 'utf-8'));
+      const chapter = Buffer.from(html, 'utf-8');
+      const converted = session
+        ? await convertHtmlWithSession(chapter, session)
+        : convertHtmlToMarkdown(chapter);
       if (converted.trim()) md += converted.trim() + '\n\n';
     }
 

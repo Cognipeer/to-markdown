@@ -4,7 +4,7 @@ import { detectFileType } from './utils/fileDetection.js';
 import { convertPdfToMarkdown } from './converters/pdf.js';
 import { convertDocToMarkdown } from './converters/doc.js';
 import { convertDocxToMarkdown } from './converters/docx.js';
-import { convertHtmlToMarkdown } from './converters/html.js';
+import { convertHtmlToMarkdownAsync } from './converters/html.js';
 import {
   convertTextFileToMarkdown,
   convertYoutubeToMarkdown,
@@ -115,7 +115,7 @@ async function convertBuffer(
 
     case '.html':
     case '.htm':
-      return convertHtmlToMarkdown(buffer);
+      return await convertHtmlToMarkdownAsync(buffer, options, ctx);
 
     case '.txt':
       return convertTextFileToMarkdown(buffer);
