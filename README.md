@@ -323,6 +323,7 @@ Converts various file formats to Markdown.
   - `ocr?: boolean | OCROptions` - Enable OCR for images and scanned PDFs (opt-in)
   - `images?: 'inline' | 'placeholder' | 'omit'` - How images embedded in DOCX/HTML/EPUB/PPTX are rendered (default: `inline`, same as 3.5.0)
   - `imageMetadata?: boolean` - Image files: emit the `ImageSize:` / `Format:` header (default: `true`)
+  - `imageTextHeading?: boolean` - Image files: put the OCR text under a `## Extracted Text` heading (default: `true`)
   - `doc?: DocOptions` - Options for binary Word `.doc` conversion
 
 `OCROptions` includes:
@@ -490,7 +491,8 @@ errors (`vlm.retries`, default 2, with 1 s / 2 s backoff and `Retry-After` up to
 **TIFF, WEBP and BMP.** `.tif`, `.tiff`, `.webp` and `.bmp` are now treated as images. (Before 3.6 they were decoded
 as text, which produced garbage.) Multi-page TIFFs get a `Pages: N` header line and, with OCR, every frame is
 recognised and the texts are joined under one `## Extracted Text`. Images with an EXIF orientation are rotated
-before OCR (`autoRotate: false` disables it). `imageMetadata: false` removes the `ImageSize:` / `Format:` header.
+before OCR (`autoRotate: false` disables it). `imageMetadata: false` removes the `ImageSize:` / `Format:` header and
+`imageTextHeading: false` the `## Extracted Text` heading; with both, an image converts to its recognised text alone.
 
 **Images embedded in documents.** `images` controls how DOCX, HTML, EPUB and PPTX render images:
 

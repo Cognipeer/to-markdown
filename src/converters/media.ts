@@ -358,7 +358,8 @@ async function ocrImageFile(
   if (hasText) {
     report.ocr = true;
     report.chars = textChars;
-    out += `\n\n## Extracted Text\n\n${parts.join('\n\n')}\n`;
+    const heading = conv.options.imageTextHeading === false ? '' : '## Extracted Text\n\n';
+    out += `\n\n${heading}${parts.join('\n\n')}\n`;
   } else if (firstError) {
     report.error = firstError.message;
     if (!multiPage) {

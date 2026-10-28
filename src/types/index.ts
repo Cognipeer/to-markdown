@@ -295,6 +295,8 @@ export interface ConverterOptions {
   images?: 'inline' | 'placeholder' | 'omit';
   /** Image files: emit the `ImageSize:` / `Format:` header (default true) */
   imageMetadata?: boolean;
+  /** Image files: put the OCR text under a `## Extracted Text` heading (default true) */
+  imageTextHeading?: boolean;
 }
 
 /**

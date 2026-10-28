@@ -82,6 +82,41 @@ describe("image formats: metadata", () => {
     expect(md).toBe("## Extracted Text\n\nOCR image");
     expect(calls).toHaveLength(1);
   });
+
+  it("imageTextHeading:false leaves the OCR text without a heading", async () => {
+    const { handler } = recorder();
+    expect(
+      await convertToMarkdown(PNG, { fileName: "a.png", imageTextHeading: false, ocr: ocr(handler) })
+    ).toBe("ImageSize: 1400x314 Format: png\n\nOCR image");
+    // Together with imageMetadata:false the result is the recognised text alone.
+    const report = await convertToMarkdownDetailed(PNG, {
+      fileName: "a.png",
+      imageMetadata: false,
+      imageTextHeading: false,
+      ocr: ocr(handler),
+    });
+    expect(report.markdown).toBe("OCR image");
+    expect(
+      await convertToMarkdown(TIF, {
+        fileName: "multipage.tif",
+        imageMetadata: false,
+        imageTextHeading: false,
+        ocr: ocr(handler),
+      })
+    ).toBe("OCR page 1\n\nOCR page 2");
+  });
+
+  it("imageTextHeading:false without any text gives an empty result", async () => {
+    const { handler } = recorder(() => "");
+    expect(
+      await convertToMarkdown(PNG, {
+        fileName: "a.png",
+        imageMetadata: false,
+        imageTextHeading: false,
+        ocr: ocr(handler),
+      })
+    ).toBe("");
+  });
 });
 
 describe("TIFF OCR", () => {

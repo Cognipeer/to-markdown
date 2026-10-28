@@ -31,7 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and OCR of embedded images with `ocr.embeddedImages` (size filter, dedupe,
   `maxImages`). EPUB images are not OCRed yet.
 - Multi-page TIFF support (`Pages: N` header, per-frame OCR), EXIF
-  auto-rotation before image OCR (`ocr.autoRotate`) and `imageMetadata: false`.
+  auto-rotation before image OCR (`ocr.autoRotate`), `imageMetadata: false`
+  and `imageTextHeading: false` (with both, an image converts to its
+  recognised text alone).
 - `FileExtension.TIF`, `TIFF`, `WEBP` and `BMP`.
 - `benchmark/ocr/run.ts` and an opt-in real Tesseract test
   (`TM_TEST_TESSERACT=1`, `TM_TESSDATA_DIR`); neither is part of `npm test`.
