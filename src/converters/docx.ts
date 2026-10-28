@@ -1,12 +1,14 @@
 import AdmZip from 'adm-zip';
 import { createHash } from 'crypto';
 import { convertToHtml, images as mammothImages } from 'mammoth';
+import { load } from 'cheerio';
 import { formatMarkdown } from '../utils/markdown.js';
 import { htmlToMarkdown } from './html.js';
 import type { ConverterOptions } from '../types/index.js';
 import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
 import {
   EmbeddedImageSession,
+  hoistTokenImagesOutOfTables,
   IMAGE_TOKEN_SCHEME,
   replaceImageTokens,
   resolveEmbeddedImagePolicy,
@@ -85,7 +87,12 @@ async function convertDocxWithImages(
   }
 
   const session = new EmbeddedImageSession(conv, policy);
-  const paths = policy.ocr ? docxMediaPaths(buffer) : new Map<string, string>();
+  const paths = policy.ocr
+    ? docxMediaPaths(
+        buffer,
+        new Set(found.map((image) => image.buffer?.length ?? 0).filter((n) => n > 0))
+      )
+    : new Map<string, string>();
   for (const image of found) {
     const bytes = image.buffer ?? Buffer.alloc(0);
     const sourcePath = bytes.length > 0 ? paths.get(sha1(bytes)) : undefined;
@@ -100,6 +107,9 @@ async function convertDocxWithImages(
   await session.runOcr();
 
   try {
+    // Images inside table cells would be dropped by the Markdown pass: move them behind the table.
+    const $ = load(html);
+    if (hoistTokenImagesOutOfTables($)) html = $.html();
     const markdown = replaceImageTokens(htmlToMarkdown(html), (id, alt, title) => {
       const entry = session.entries[id];
       const block = entry?.block || undefined;
@@ -120,13 +130,17 @@ function sha1(bytes: Buffer): string {
   return createHash('sha1').update(bytes).digest('hex');
 }
 
-/** sha1 of every `word/media/*` entry -> its path (mammoth does not expose where a picture came from). */
-function docxMediaPaths(buffer: Buffer): Map<string, string> {
+/**
+ * sha1 of the `word/media/*` entries -> their path (mammoth does not expose where a
+ * picture came from). Only entries whose size matches a found picture are read.
+ */
+function docxMediaPaths(buffer: Buffer, sizes: Set<number>): Map<string, string> {
   const paths = new Map<string, string>();
   try {
     const zip = new AdmZip(buffer);
     for (const entry of zip.getEntries()) {
       if (entry.isDirectory || !entry.entryName.startsWith('word/media/')) continue;
+      if (!sizes.has(entry.header.size)) continue;
       const hash = sha1(entry.getData());
       if (!paths.has(hash)) paths.set(hash, entry.entryName);
     }

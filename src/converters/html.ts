@@ -6,6 +6,7 @@ import type { ConverterOptions, TurndownOptions } from '../types/index.js';
 import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
 import {
   EmbeddedImageSession,
+  hoistTokenImagesOutOfTables,
   IMAGE_TOKEN_SCHEME,
   replaceImageTokens,
   resolveEmbeddedImagePolicy,
@@ -183,11 +184,16 @@ export async function convertHtmlToMarkdownAsync(
 }
 
 /** Parses a `data:image/...` URI into bytes; `undefined` for anything else. */
-function decodeImageDataUri(src: string): { buffer: Buffer; mimeType: string } | undefined {
+function decodeImageDataUri(
+  src: string,
+  needBytes = true
+): { buffer: Buffer; mimeType: string } | undefined {
   const match = /^data:([^;,]*)((?:;[^,]*)?),([\s\S]*)$/i.exec(src.trim());
   if (!match) return undefined;
   const mimeType = match[1].trim().toLowerCase();
   if (!mimeType.startsWith('image/')) return undefined;
+  // Without OCR only the type matters: do not decode (and hold) the bytes.
+  if (!needBytes) return { buffer: Buffer.alloc(0), mimeType };
   try {
     const buffer = /;base64/i.test(match[2])
       ? Buffer.from(match[3].replace(/\s+/g, ''), 'base64')
@@ -217,7 +223,7 @@ export async function convertHtmlWithSession(
       .forEach((el) => {
         const node = $(el);
         const src = node.attr('src') ?? '';
-        const decoded = decodeImageDataUri(src);
+        const decoded = decodeImageDataUri(src, !!policy.ocr);
         if (decoded) {
           const entry = session.register({ buffer: decoded.buffer, mimeType: decoded.mimeType });
           sources.set(entry.index, src);
@@ -226,6 +232,7 @@ export async function convertHtmlWithSession(
           node.remove();
         }
       });
+    hoistTokenImagesOutOfTables($);
     prepared = $.html();
   } catch (err: any) {
     throw new Error(`Failed to convert HTML: ${err.message}`);

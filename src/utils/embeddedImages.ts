@@ -1,3 +1,4 @@
+import type { CheerioAPI } from 'cheerio';
 import { createHash } from 'crypto';
 import { imageDimensionsFromData } from 'image-dimensions';
 import { lookup } from 'mime-types';
@@ -261,12 +262,15 @@ export class EmbeddedImageSession {
       signal: this.conv.signal,
       onProgress: ocr.onProgress,
       kind: 'embedded-image',
+      stopOnError: onError === 'throw',
     });
 
     let firstError: Error | undefined;
     outcomes.forEach((outcome, i) => {
       const entry = queued[i];
       entry.ocrDone = true;
+      // Release the picture bytes; they are not needed any more.
+      entry.input = { ...entry.input, buffer: Buffer.alloc(0) };
       const label = entry.input.sourcePath ?? entry.placeholder;
       if (outcome.status === 'ok') {
         if (outcome.value) {
@@ -323,8 +327,15 @@ export interface ImageTokenReplacement {
 
 /**
  * Replaces every `![alt](tmimg://<n>)` (optionally with a `"title"`) in `markdown`.
- * Where the image is removed ('omit') the spaces it leaves behind are cleaned up;
- * a block (OCR text) is put in its own paragraph right after the image.
+ *
+ * - The alt text may span lines (Turndown keeps single newlines in `alt`); it is
+ *   handed to `replace` with the whitespace collapsed.
+ * - Where the image is removed ('omit') the spaces it leaves behind are cleaned up,
+ *   and a link that only wrapped the image (`[![](..)](href)`) is dropped with it.
+ * - A block (OCR text) is put in its own paragraph after the line that holds the
+ *   image, so it never splits a sentence or a link; inside a list item it is
+ *   indented to belong to that item.
+ * - Tokens that cannot be parsed are removed so the sentinel never reaches the output.
  *
  * @param replace - receives the token's id, its alt text and its title part
  *   (`' "title"'` or `''`)
@@ -336,30 +347,119 @@ export function replaceImageTokens(
   const marker = `](${IMAGE_TOKEN_SCHEME}`;
   const tokenTail = /^(\d+)((?:[ \t]+"(?:[^"\\\n]|\\.)*")?)\)/;
   let done = '';
-  let rest = markdown;
+  let pos = 0; // everything before `pos` is already in `done` (or consumed)
   let from = 0;
+  let pending: string[] = [];
+  let pendingIndent = '';
+
+  const flush = (): string => {
+    const text = pending
+      .map((block) =>
+        pendingIndent
+          ? block
+              .split('\n')
+              .map((line) => (line ? pendingIndent + line : line))
+              .join('\n')
+          : block
+      )
+      .join('\n\n');
+    pending = [];
+    return `\n\n${text}`;
+  };
+
+  /** Copies `markdown[pos..end)` to the output, flushing pending blocks at the first line end. */
+  const copyUntil = (end: number): void => {
+    const segment = markdown.slice(pos, end);
+    if (pending.length > 0) {
+      const nl = segment.indexOf('\n');
+      if (nl >= 0) {
+        // Same-line text stays, the block follows, the next paragraph/item resumes.
+        const isList = pendingIndent !== '';
+        const tailText = segment.slice(nl);
+        done = (done + segment.slice(0, nl)).replace(/[ \t]+$/, '');
+        done += flush() + (isList ? tailText : tailText.replace(/^\n+/, '\n\n'));
+        pos = end;
+        return;
+      }
+    }
+    done += segment;
+    pos = end;
+  };
+
   for (;;) {
-    const m = rest.indexOf(marker, from);
+    const m = markdown.indexOf(marker, from);
     if (m < 0) break;
-    const tail = tokenTail.exec(rest.slice(m + marker.length, m + marker.length + 4096));
-    const lineStart = rest.lastIndexOf('\n', m) + 1;
-    const start = rest.lastIndexOf('![', m);
-    if (!tail || start < lineStart) {
+    const tail = tokenTail.exec(markdown.slice(m + marker.length, m + marker.length + 4096));
+    // Never reach back over a paragraph break.
+    const paragraphStart = markdown.lastIndexOf('\n\n', m) + 1;
+    const start = markdown.lastIndexOf('![', m);
+    if (!tail || start < 0 || start < paragraphStart) {
       from = m + marker.length;
       continue;
     }
-    const { image, block } = replace(Number(tail[1]), rest.slice(start + 2, m), tail[2]);
-    done += rest.slice(0, start) + image;
-    let after = rest.slice(m + marker.length + tail[0].length);
-    if (block) {
-      done += `\n\n${block}\n\n`;
-      after = after.replace(/^[ \t]+/, '');
-    } else if (image === '' && (done === '' || done.endsWith('\n'))) {
-      // Dropping the image must not leave a stray leading space on its line.
-      after = after.replace(/^[ \t]+/, '');
+    const alt = markdown.slice(start + 2, m).replace(/\s*\n\s*/g, ' ');
+    const tokenEnd = m + marker.length + tail[0].length;
+    const { image, block } = replace(Number(tail[1]), alt, tail[2]);
+
+    copyUntil(start);
+    if (block && pending.length === 0) {
+      const lineStart = markdown.lastIndexOf('\n', start) + 1;
+      const listMarker = /^[ \t]*(?:[*+-]|\d+[.)])[ \t]+/.exec(markdown.slice(lineStart, start));
+      pendingIndent = listMarker ? ' '.repeat(listMarker[0].length) : '';
     }
-    rest = after;
-    from = 0;
+    if (block) pending.push(block);
+
+    pos = tokenEnd;
+    from = tokenEnd;
+    if (image === '') {
+      const atLineStart = done === '' || done.endsWith('\n');
+      if (done.endsWith('[') && markdown.startsWith('](', pos)) {
+        // The image was the only content of a link: drop the link too.
+        const close = markdown.indexOf(')', pos);
+        if (close >= 0) {
+          done = done.slice(0, -1);
+          pos = close + 1;
+          from = pos;
+        }
+      }
+      const spaces = /^[ \t]+/.exec(markdown.slice(pos));
+      if (spaces && (atLineStart || /[ \t]$/.test(done))) {
+        // No stray leading space on a line, no double space where an inline image was.
+        pos += spaces[0].length;
+        from = pos;
+      }
+    } else {
+      done += image;
+    }
   }
-  return done + rest;
+  copyUntil(markdown.length);
+  if (pending.length > 0) done += flush();
+  // Safety net: the sentinel must never leak.
+  return done.replace(/!\[[^\]]*\]\(tmimg:\/\/\d+[^)\n]*\)|tmimg:\/\/\d+/g, '');
+}
+
+/**
+ * Moves images that carry an image token out of tables. Turndown drops everything
+ * but the text of a table cell, so a token left inside a cell would be lost (and
+ * its OCR text with it); it is placed right after the outermost table instead.
+ *
+ * @returns true when something was moved
+ */
+export function hoistTokenImagesOutOfTables($: CheerioAPI): boolean {
+  let moved = false;
+  const lastAfter = new Map<unknown, ReturnType<CheerioAPI>>();
+  $('table img').each((_, el) => {
+    const src = $(el).attr('src') ?? '';
+    if (!src.startsWith(IMAGE_TOKEN_SCHEME)) return;
+    const outer = $(el).parents('table').last();
+    if (outer.length === 0) return;
+    const holder = $('<p></p>');
+    holder.append($(el).clone());
+    const anchor = lastAfter.get(outer[0]) ?? outer;
+    anchor.after(holder);
+    lastAfter.set(outer[0], holder);
+    $(el).remove();
+    moved = true;
+  });
+  return moved;
 }

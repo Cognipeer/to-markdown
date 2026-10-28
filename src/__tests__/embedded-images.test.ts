@@ -494,6 +494,94 @@ describe("replaceImageTokens", () => {
     const md = "text ](tmimg://x) and ![broken](tmimg://";
     expect(replaceImageTokens(md, () => ({ image: "!" }))).toBe(md);
   });
+
+  it("accepts alt text that spans lines and never leaks the sentinel", () => {
+    const out = replaceImageTokens("a ![l1\nl2](tmimg://0) b", (_id, alt) => ({ image: `![${alt}](x)` }));
+    expect(out).toBe("a ![l1 l2](x) b");
+    expect(replaceImageTokens("a ![x](tmimg://9 broken) b tmimg://3", () => ({ image: "!" }))).not.toContain("tmimg");
+  });
+
+  it("puts the block after the line, not inside a link", () => {
+    const out = replaceImageTokens(`[${token(0, "logo")}](http://x.com)\n\nNext`, () => ({
+      image: "![logo](image-1.png)",
+      block: "> ocr",
+    }));
+    expect(out).toBe("[![logo](image-1.png)](http://x.com)\n\n> ocr\n\nNext");
+  });
+
+  it("indents the block inside a list item and keeps the list together", () => {
+    const out = replaceImageTokens(`* item ${token(0)}\n* two`, () => ({ image: "", block: "> ocr" }));
+    expect(out).toBe("* item\n\n  > ocr\n* two");
+  });
+
+  it("drops a link that only wrapped a removed image and collapses double spaces", () => {
+    expect(replaceImageTokens(`a [${token(0)}](http://x.com) b`, () => ({ image: "" }))).toBe("a b");
+    expect(replaceImageTokens(`para ${token(0)} tail`, () => ({ image: "" }))).toBe("para tail");
+  });
+});
+
+describe("embedded images in tables, multi-line alt and omit spacing (HTML)", () => {
+  const PNG = readFileSync(join(FIXTURES, "images.html"), "utf-8").match(/data:image\/png;base64,[A-Za-z0-9+/=]+/)?.[0];
+  const wrap = (body: string) => Buffer.from(`<html><body>${body}</body></html>`);
+
+  it("keeps OCR text of a multi-line alt image", async () => {
+    expect(PNG).toBeTruthy();
+    const { handler } = recordingHandler();
+    const out = await convert(wrap(`<p>a <img src="${PNG}" alt="l1\nl2"> b</p>`), "x.html", {
+      images: "placeholder",
+      ocr: ocrOptions(handler, {}, { minWidth: 1, minHeight: 1 }),
+    });
+    expect(out).not.toContain("tmimg");
+    expect(out).toContain("image-1.png");
+    expect(out).toContain("> OCR 0");
+  });
+
+  it("does not break a link or a list around the OCR block", async () => {
+    const { handler } = recordingHandler();
+    const out = await convert(
+      wrap(`<p><a href="http://x.com"><img src="${PNG}" alt="logo"></a></p><ul><li>item <img src="${PNG}x" alt="q"></li><li>two</li></ul>`),
+      "x.html",
+      { images: "placeholder", ocr: ocrOptions(handler, {}, { minWidth: 1, minHeight: 1, dedupe: false }) }
+    );
+    expect(out).toContain("[![logo](image-1.png)](http://x.com)");
+    expect(out).not.toMatch(/\[!\[logo\]\(image-1\.png\)\n/);
+    expect(out).toMatch(/\*\s+item/);
+    expect(out).toMatch(/\n\s+> OCR 1/);
+    expect(out).toMatch(/\*\s+two/);
+  });
+
+  it("moves images out of table cells so their OCR text survives", async () => {
+    const { handler } = recordingHandler();
+    const out = await convert(
+      wrap(`<table><tr><th>A</th><th>B</th></tr><tr><td><img src="${PNG}" alt="cell"></td><td>x</td></tr></table>`),
+      "x.html",
+      { images: "placeholder", ocr: ocrOptions(handler, {}, { minWidth: 1, minHeight: 1 }) }
+    );
+    expect(out).toContain("| A | B |");
+    expect(out).toContain("![cell](image-1.png)");
+    expect(out).toContain("> OCR 0");
+    expect(out).not.toContain("tmimg");
+  });
+
+  it("omit leaves no double space", async () => {
+    const out = await convert(wrap(`<p>para <img src="${PNG}"> tail</p>`), "x.html", { images: "omit" });
+    expect(out).toBe("para tail");
+  });
+
+  it("onError: 'throw' stops scheduling after the first failure", async () => {
+    let calls = 0;
+    const handler = async () => {
+      calls++;
+      throw new Error("boom");
+    };
+    const html = wrap(`<img src="${PNG}"><img src="${PNG}x"><img src="${PNG}y">`);
+    await expect(
+      convert(html, "x.html", {
+        ocr: ocrOptions(handler, { onError: "throw", concurrency: 1 }, { minWidth: 1, minHeight: 1, dedupe: false }),
+      })
+    ).rejects.toThrow("boom");
+    expect(calls).toBe(1);
+  });
 });
 
 describe("repository hygiene", () => {

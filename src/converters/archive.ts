@@ -89,7 +89,8 @@ async function convertPptxWithImages(
           const media = zip.getEntry(pic.mediaPath);
           if (!media) continue;
           const registered = session.register({
-            buffer: media.getData(),
+            // The bytes are only needed for OCR; the type comes from the file name.
+            buffer: policy.ocr ? media.getData() : Buffer.alloc(0),
             sourcePath: pic.mediaPath,
             slide: Number(slideNumber),
           });

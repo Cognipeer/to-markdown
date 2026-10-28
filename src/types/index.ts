@@ -233,7 +233,9 @@ export interface OCROptions {
   onProgress?: (event: OCRProgressEvent) => void;
   /**
    * What to do when OCR of a page/image fails. Default is the legacy behaviour of
-   * each format (`'comment'` for images, `'skip'` for `auto-page` PDFs).
+   * each format (`'comment'` for images, `'skip'` for `auto-page` PDFs and for
+   * images embedded in DOCX/PPTX/HTML, where a failure is recorded in the report and
+   * as an `ocr_image_failed` warning).
    */
   onError?: 'comment' | 'skip' | 'throw';
   /** OCR the whole PDF in a single call instead of rendering one image per page */
