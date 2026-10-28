@@ -111,7 +111,8 @@ const markdown = await convertToMarkdown("scan.pdf", {
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `provider` | `OCRProvider` | `'tesseract'` | OCR engine: Tesseract, a VLM provider or your own `handler`. |
-| `lang` | `string \| string[]` | `'eng'` | Tesseract codes (`'tur+eng'`) or ISO 639-1 codes (`'tr+en'`, `['tr','en']`). ISO codes are mapped for Tesseract and passed to handlers as `langHint`. |
+| `lang` | `string` | `'eng'` | Tesseract codes (`'tur+eng'`) or ISO 639-1 codes (`'tr+en'`). ISO codes are mapped for Tesseract and passed to handlers as `langHint`. |
+| `languages` | `string[]` | none | The same as a list (`['tr', 'en']`); wins over `lang` when both are set. |
 | `pdfMode` | `'auto' \| 'auto-page' \| 'always' \| 'never'` | `'auto'` | `auto`: OCR the whole PDF only when it has no text. `auto-page`: OCR only pages whose text layer is missing, garbled or too short. `always`: OCR every page and replace the text. `never`: no PDF OCR. |
 | `pageTrigger` | `{ minChars?, maxGarbledRatio?, requireImage? }` | `32`, `0.3`, `true` | Candidate rules for `auto-page`. A page with fewer than `minChars` non-whitespace characters needs a raster image (unless `requireImage: false`); `maxGarbledRatio: 0` disables the garbled check. |
 | `render` | `{ scale?, maxPixels?, format?, jpegQuality?, grayscale? }` | `2`, `40_000_000`, `'png'`, `85`, `false` | How PDF pages are rasterised. `scale` is reduced when the page would exceed `maxPixels`. |
@@ -121,7 +122,7 @@ const markdown = await convertToMarkdown("scan.pdf", {
 | `signal` | `AbortSignal` | none | Cancels the conversion; the promise rejects with the signal's reason (`AbortError`). Never swallowed by `onError`. |
 | `onProgress` | `(event: OCRProgressEvent) => void` | none | Called after every finished OCR task. |
 | `onError` | `'comment' \| 'skip' \| 'throw'` | per format | `comment` (image files: `<!-- OCR failed: msg -->`), `skip` (`auto-page` PDFs and embedded images; recorded in the report), `throw`. Does not apply to the legacy `auto` / `always` PDF modes, which keep their 3.5.0 behaviour. |
-| `handler` | `OCRHandler` | none | Required when `provider: 'handler'`. May return a string or `{ text, markdown?, confidence? }`. |
+| `handler` | `OCRHandler \| OCRRichHandler` | none | Required when `provider: 'handler'`. May return a string or `{ text, markdown?, confidence? }`. |
 | `documentHandler` | `OCRDocumentHandler` | none | OCR the whole PDF in one call instead of one rendered image per page. |
 | `vlm` | `VLMOptions` | none | Required for VLM providers. New: `retries` (2) and `timeoutMs`. |
 | `tesseract` | `TesseractOptions` | none | `langPath`, `cachePath`, `offline`, `psm`, `oem`, `gzip` (default `true`). `offline: true` requires `langPath` and never downloads or caches language data. |

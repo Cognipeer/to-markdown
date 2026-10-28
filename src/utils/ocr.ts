@@ -130,7 +130,7 @@ async function ocrWithHandler(
   }
   const handlerContext: OCRHandlerContext = { ...context };
   if (handlerContext.langHint === undefined) {
-    const hint = toIsoLangList(opts.lang);
+    const hint = toIsoLangList(opts.languages ?? opts.lang);
     if (hint) handlerContext.langHint = hint;
   }
   if (handlerContext.signal === undefined && signal) handlerContext.signal = signal;

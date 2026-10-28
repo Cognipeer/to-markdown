@@ -328,7 +328,8 @@ Converts various file formats to Markdown.
 `OCROptions` includes:
 
 - `provider?: 'tesseract' | 'openai-vlm' | 'anthropic-vlm' | 'ollama-vlm' | 'azure-vision' | 'custom-vlm' | 'handler'`
-- `lang?: string | string[]` - Tesseract codes (`'eng'`, `'tur+eng'`) or ISO 639-1 codes (`'tr'`, `'tr+en'`, `['tr', 'en']`); default `eng`
+- `lang?: string` - Tesseract codes (`'eng'`, `'tur+eng'`) or ISO 639-1 codes (`'tr'`, `'tr+en'`); default `eng`
+- `languages?: string[]` - the same as a list (`['tr', 'en']`); wins over `lang` when both are set
 - `pdfMode?: 'auto' | 'auto-page' | 'always' | 'never'` - PDF OCR mode (default: `auto`)
 - `vlm?: { model: string; apiKey?: string; apiBase?: string; prompt?: string; maxTokens?: number; retries?: number; timeoutMs?: number }`
 - `handler?: (buffer, context) => Promise<string | { text; markdown?; confidence? }>` - Custom async OCR callback (required when `provider: 'handler'`; library makes no HTTP calls)

@@ -640,7 +640,7 @@ async function runDocumentHandler(
           run: async (signal) => {
             const context: OCRDocumentHandlerContext = { pages, pageCount };
             if (fileName !== undefined) context.fileName = fileName;
-            const hint = toIsoLangList(ocrOpts.lang);
+            const hint = toIsoLangList(ocrOpts.languages ?? ocrOpts.lang);
             if (hint) context.langHint = hint;
             if (signal) context.signal = signal;
             return handler(buffer, context);

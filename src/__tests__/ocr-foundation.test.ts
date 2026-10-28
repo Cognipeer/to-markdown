@@ -308,7 +308,7 @@ describe("handler results and context", () => {
     });
     await convertToMarkdown(mixedPdf, {
       fileName: "m.pdf",
-      ocr: { provider: "handler", pdfMode: "always", lang: ["tr", "en"], handler: async (_b, ctx) => { seen.push(ctx); return "x"; } },
+      ocr: { provider: "handler", pdfMode: "always", languages: ["tr", "en"], handler: async (_b, ctx) => { seen.push(ctx); return "x"; } },
     });
     expect(seen[0]).toMatchObject({ kind: "image", index: 0, langHint: ["tr", "en"], mimeType: "image/png" });
     expect(seen[0].signal).toBeInstanceOf(AbortSignal);
@@ -386,7 +386,7 @@ describe("tesseract session", () => {
     await convertToMarkdown(samplePng, { fileName: "a.png", ocr: { lang: "tr+en" } });
     expect(tess.createWorker.mock.calls[0][0]).toBe("tur+eng");
     tess.createWorker.mockClear();
-    await convertToMarkdown(samplePng, { fileName: "a.png", ocr: { lang: ["tr", "eng"] } });
+    await convertToMarkdown(samplePng, { fileName: "a.png", ocr: { languages: ["tr", "eng"] } });
     expect(tess.createWorker.mock.calls[0][0]).toBe("tur+eng");
   });
 

@@ -202,10 +202,16 @@ interface OCRHandlerContext {
 type OCRHandler = (
   buffer: Buffer,
   context: OCRHandlerContext
+) => Promise<string>;
+
+// added in 3.6.0: a handler may also resolve to an OCRHandlerResult
+type OCRRichHandler = (
+  buffer: Buffer,
+  context: OCRHandlerContext
 ) => Promise<string | OCRHandlerResult>;
 ```
 
-A handler that returns a string keeps working unchanged.
+`OCROptions.handler` accepts either. A handler that returns a string keeps working unchanged.
 
 ### OCRHandlerResult
 
@@ -243,11 +249,12 @@ type OCRDocumentHandler = (
 ```typescript
 interface OCROptions {
   provider?: OCRProvider;
-  lang?: string | string[];
+  lang?: string;
   pdfMode?: OCRPdfMode;
   vlm?: VLMOptions;
-  handler?: OCRHandler;
+  handler?: OCRHandler | OCRRichHandler;
   // added in 3.6.0
+  languages?: string[];
   pageTrigger?: OCRPageTrigger;
   render?: OCRRenderOptions;
   maxPages?: number;

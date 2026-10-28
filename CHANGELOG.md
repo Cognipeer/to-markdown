@@ -49,11 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the legacy `pdfMode` values) the document structure and text are
   identical to 3.5.0 for the inputs covered by the golden-output test, which
   uses a fixed fake OCR handler.
-- Public types gained optional members. Two existing types were widened:
-  `OCROptions.lang` is now `string | string[]` and `OCRHandler` may return
-  `string | OCRHandlerResult`. Handlers that return a string keep compiling,
-  but strict TypeScript code that reads `lang` as a `string`, or that calls a
-  stored `OCRHandler` and uses the result as a string, needs a narrowing.
+- Public types only gained optional members and new types. `OCRHandler`,
+  `OCROptions.lang` (still a `string`) and every existing result type are
+  unchanged; two input options accept more values: `pdfMode` adds
+  `'auto-page'`, and `handler` also takes an `OCRRichHandler` (a handler that
+  may resolve to `{ text, markdown?, confidence? }`). Language lists go in the
+  new `OCROptions.languages`.
 
 ### Behaviour notes
 

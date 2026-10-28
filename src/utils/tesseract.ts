@@ -130,7 +130,7 @@ export class TesseractSession {
   }
 
   private async start(): Promise<void> {
-    const lang = toTesseractLang(this.opts.lang) ?? 'eng';
+    const lang = toTesseractLang(this.opts.languages ?? this.opts.lang) ?? 'eng';
     this.checkOffline(lang);
     const tesseract = await loadTesseract();
     this.assertAlive();

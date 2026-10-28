@@ -70,10 +70,19 @@ export interface OCRHandlerResult {
 }
 
 /**
- * Custom OCR callback. May resolve to a plain string (3.5.0 behaviour) or to an
- * {@link OCRHandlerResult}.
+ * Custom OCR callback that resolves to the recognised text.
  */
 export type OCRHandler = (
+  buffer: Buffer,
+  context: OCRHandlerContext
+) => Promise<string>;
+
+/**
+ * Custom OCR callback that may resolve to a plain string or to an
+ * {@link OCRHandlerResult} (for example Markdown plus a confidence).
+ * Accepted by `OCROptions.handler` alongside {@link OCRHandler}.
+ */
+export type OCRRichHandler = (
   buffer: Buffer,
   context: OCRHandlerContext
 ) => Promise<string | OCRHandlerResult>;
@@ -206,17 +215,22 @@ export interface OCROptions {
   /** OCR provider to use (default: 'tesseract') */
   provider?: OCRProvider;
   /**
-   * Tesseract language: tesseract codes (`'eng'`, `'tur+eng'`), ISO 639-1 codes
-   * (`'tr'`, `'tr+en'`) or an array of either (default: 'eng'). Mapped with
-   * `toTesseractLang` for the 'tesseract' provider; handlers receive ISO codes as `langHint`.
+   * Tesseract language: tesseract codes (`'eng'`, `'tur+eng'`) or ISO 639-1 codes
+   * (`'tr'`, `'tr+en'`) (default: 'eng'). Mapped with `toTesseractLang` for the
+   * 'tesseract' provider; handlers receive ISO codes as `langHint`.
    */
-  lang?: string | string[];
+  lang?: string;
+  /**
+   * Languages as a list (ISO 639-1 or tesseract codes, e.g. `['tr', 'en']`).
+   * Takes precedence over `lang` when both are set.
+   */
+  languages?: string[];
   /** PDF OCR mode: 'auto' = fallback when no text found, 'auto-page' = per page, 'always' = always OCR, 'never' = skip (default: 'auto') */
   pdfMode?: OCRPdfMode;
   /** VLM configuration — required when provider is any VLM type */
   vlm?: VLMOptions;
   /** Required when provider is 'handler'. Library performs no HTTP calls. */
-  handler?: OCRHandler;
+  handler?: OCRHandler | OCRRichHandler;
   /** Which pages are OCR candidates in `pdfMode: 'auto-page'` */
   pageTrigger?: OCRPageTrigger;
   /** How PDF pages are rasterised before OCR */
