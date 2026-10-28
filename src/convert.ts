@@ -149,6 +149,10 @@ async function convertBuffer(
     case '.jpeg':
     case '.png':
     case '.gif':
+    case '.tif':
+    case '.tiff':
+    case '.webp':
+    case '.bmp':
       return await convertImageToMarkdown(buffer, ext, options.ocr, options.fileName, ctx);
 
     case '.json':

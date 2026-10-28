@@ -2,10 +2,11 @@ import { imageDimensionsFromData } from 'image-dimensions';
 import { lookup } from 'mime-types';
 import { parseBuffer } from 'music-metadata';
 import { formatMarkdown } from '../utils/markdown.js';
-import type { ImageReport, OCROptions } from '../types/index.js';
+import type { ImageReport, OCRImageKind, OCROptions } from '../types/index.js';
 import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
 import { countChars } from '../utils/chars.js';
-import { OcrTimeoutError, runOcrTasks } from '../utils/ocrRunner.js';
+import { sniffImageMimeType } from '../utils/imageTranscode.js';
+import { OcrTimeoutError, runOcrTasks, type OcrTask, type OcrTaskOutcome } from '../utils/ocrRunner.js';
 
 function imageMimeType(
   ext: string,
@@ -59,6 +60,109 @@ class PassThroughError extends Error {
   }
 }
 
+interface MeasuredImage {
+  width: number;
+  height: number;
+  type: string;
+}
+
+/** Formats `image-dimensions` cannot always measure; they get the sharp / canvas fallbacks. */
+const FALLBACK_EXTENSIONS = new Set(['.tif', '.tiff', '.webp', '.bmp']);
+
+/** Spelling of a format in the `Format:` header (`jpeg` -> `jpg`, `tif` -> `tiff`). */
+function headerType(type: string): string {
+  const t = type.toLowerCase();
+  if (t === 'jpeg') return 'jpg';
+  if (t === 'tif') return 'tiff';
+  return t;
+}
+
+/**
+ * Measures formats `image-dimensions` could not read: sharp for TIFF / WebP,
+ * the bundled canvas for BMP (which sharp cannot decode).
+ */
+async function measureFallback(buffer: Buffer, ext: string): Promise<MeasuredImage | undefined> {
+  const sniffed = sniffImageMimeType(buffer);
+  if (sniffed !== 'image/bmp') {
+    try {
+      const sharp = (await import('sharp')).default;
+      const meta = await sharp(buffer).metadata();
+      if (meta.width && meta.height) {
+        return { width: meta.width, height: meta.height, type: headerType(meta.format ?? 'image') };
+      }
+    } catch {
+      /* try the canvas below */
+    }
+  }
+  try {
+    const { loadImage } = await import('@napi-rs/canvas');
+    const image = await loadImage(buffer);
+    if (image.width && image.height) {
+      const type =
+        sniffed && sniffed.startsWith('image/')
+          ? headerType(sniffed.slice('image/'.length))
+          : headerType(ext.replace(/^\./, ''));
+      return { width: image.width, height: image.height, type };
+    }
+  } catch {
+    /* unsupported */
+  }
+  return undefined;
+}
+
+/** Number of pages (frames) of a TIFF; 1 when it cannot be read. */
+async function tiffPageCount(buffer: Buffer): Promise<number> {
+  try {
+    const sharp = (await import('sharp')).default;
+    const meta = await sharp(buffer).metadata();
+    return meta.pages && meta.pages > 0 ? meta.pages : 1;
+  } catch {
+    return 1;
+  }
+}
+
+interface PreparedImage {
+  buffer: Buffer;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * Applies the EXIF orientation of `buffer` (sharp `.rotate()`) when it is greater
+ * than 1. Returns `undefined` when nothing needs to change or sharp cannot read it,
+ * so callers keep the original bytes.
+ */
+async function autoRotateImage(buffer: Buffer, mimeType?: string): Promise<PreparedImage | undefined> {
+  try {
+    const sharp = (await import('sharp')).default;
+    const meta = await sharp(buffer).metadata();
+    if (!meta.orientation || meta.orientation <= 1) return undefined;
+    const pipeline = sharp(buffer).rotate();
+    const keepJpeg = meta.format === 'jpeg';
+    const { data, info } = await (keepJpeg ? pipeline.jpeg({ quality: 92 }) : pipeline.png()).toBuffer({
+      resolveWithObject: true,
+    });
+    return {
+      buffer: data,
+      mimeType: keepJpeg ? 'image/jpeg' : 'image/png',
+      width: info.width,
+      height: info.height,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Renders page `index` (0-based) of a TIFF as PNG, honouring its orientation tag. */
+async function renderTiffPage(buffer: Buffer, index: number, autoRotate: boolean): Promise<PreparedImage> {
+  const sharp = (await import('sharp')).default;
+  let pipeline = sharp(buffer, { page: index });
+  if (autoRotate) pipeline = pipeline.rotate();
+  const { data, info } = await pipeline.png().toBuffer({ resolveWithObject: true });
+  return { buffer: data, mimeType: 'image/png', width: info.width, height: info.height };
+}
+
 async function convertImage(
   buffer: Buffer,
   ext: string,
@@ -67,7 +171,13 @@ async function convertImage(
   conv: ConversionContext
 ): Promise<string> {
   try {
-    const measured = imageDimensionsFromData(buffer);
+    let measured: MeasuredImage | undefined | null = imageDimensionsFromData(buffer) as
+      | MeasuredImage
+      | undefined
+      | null;
+    if (!measured && FALLBACK_EXTENSIONS.has(ext.toLowerCase())) {
+      measured = await measureFallback(buffer, ext);
+    }
     if (!measured) {
       throw new Error('unsupported or invalid image data');
     }
@@ -77,17 +187,26 @@ async function convertImage(
     const dimensions = {
       width: measured.width,
       height: measured.height,
-      type: measured.type === 'jpeg' ? 'jpg' : measured.type,
+      type: measured.type === 'jpeg' ? 'jpg' : measured.type === 'tif' ? 'tiff' : measured.type,
     };
+
+    const isTiff = dimensions.type === 'tiff' || sniffImageMimeType(buffer) === 'image/tiff';
+    const pageCount = isTiff ? await tiffPageCount(buffer) : 1;
 
     let md = '';
 
-    if (dimensions.width && dimensions.height) {
-      md += `ImageSize: ${dimensions.width}x${dimensions.height}\n`;
-    }
+    if (conv.options.imageMetadata !== false) {
+      if (dimensions.width && dimensions.height) {
+        md += `ImageSize: ${dimensions.width}x${dimensions.height}\n`;
+      }
 
-    if (dimensions.type) {
-      md += `Format: ${dimensions.type}\n`;
+      if (dimensions.type) {
+        md += `Format: ${dimensions.type}\n`;
+      }
+
+      if (pageCount > 1) {
+        md += `Pages: ${pageCount}\n`;
+      }
     }
 
     const report: ImageReport = {
@@ -103,56 +222,7 @@ async function convertImage(
     // OCR — opt-in only
     if (ocr) {
       const ocrOpts: OCROptions = typeof ocr === 'object' ? ocr : {};
-      try {
-        const { ocrImageDetailed } = await import('../utils/ocr.js');
-        const mimeType = imageMimeType(ext, fileName, dimensions.type);
-        const [outcome] = await runOcrTasks(
-          [
-            {
-              run: (signal) =>
-                ocrImageDetailed(
-                  buffer,
-                  ocrOpts,
-                  {
-                    mimeType,
-                    sourceExtension: ext,
-                    fileName,
-                    imageWidth: dimensions.width,
-                    imageHeight: dimensions.height,
-                    kind: 'image',
-                    index: 0,
-                    ...(signal ? { signal } : {}),
-                  },
-                  conv
-                ),
-            },
-          ],
-          {
-            timeoutMs: ocrOpts.timeoutMs,
-            signal: conv.signal,
-            onProgress: ocrOpts.onProgress,
-            kind: 'image',
-          }
-        );
-        if (outcome.status === 'error') throw outcome.error;
-        if (outcome.status === 'ok') {
-          const text = outcome.value.markdown ?? outcome.value.text;
-          if (text) {
-            md += `\n\n## Extracted Text\n\n${text}\n`;
-            report.ocr = true;
-            report.chars = countChars(text);
-          }
-        }
-      } catch (ocrErr: any) {
-        // Cancellation is never swallowed by `onError`.
-        if (conv.signal && conv.signal.aborted) throw new PassThroughError(ocrErr);
-        report.error = ocrErr.message;
-        if (ocrErr instanceof OcrTimeoutError) conv.warn('ocr_timeout', fileName ?? 'image');
-        else conv.warn('ocr_image_failed', `${fileName ?? 'image'}: ${ocrErr.message}`);
-        const onError = ocrOpts.onError ?? 'comment';
-        if (onError === 'throw') throw new PassThroughError(ocrErr);
-        if (onError === 'comment') md += `\n\n<!-- OCR failed: ${ocrErr.message} -->\n`;
-      }
+      md += await ocrImageFile(buffer, ext, ocrOpts, fileName, dimensions, isTiff, pageCount, report, conv);
     }
 
     return formatMarkdown(md);
@@ -160,6 +230,148 @@ async function convertImage(
     if (err instanceof PassThroughError) throw err.original;
     throw new Error(`Failed to convert image: ${err.message}`);
   }
+}
+
+/** Runs OCR for an image file (all pages of a TIFF) and returns the Markdown to append. */
+async function ocrImageFile(
+  buffer: Buffer,
+  ext: string,
+  ocrOpts: OCROptions,
+  fileName: string | undefined,
+  dimensions: { width?: number; height?: number; type?: string },
+  isTiff: boolean,
+  pageCount: number,
+  report: ImageReport,
+  conv: ConversionContext
+): Promise<string> {
+  const autoRotate = ocrOpts.autoRotate !== false;
+  const multiPage = isTiff && pageCount > 1;
+  const kind: OCRImageKind = multiPage ? 'tiff-page' : 'image';
+  const label = fileName ?? 'image';
+  const onError = ocrOpts.onError ?? 'comment';
+  const mimeType = imageMimeType(ext, fileName, dimensions.type);
+
+  let outcomes: OcrTaskOutcome<string>[];
+  try {
+    const { ocrImageDetailed } = await import('../utils/ocr.js');
+    const taskCount = isTiff ? pageCount : 1;
+    const tasks: OcrTask<string>[] = [];
+    for (let i = 0; i < taskCount; i++) {
+      tasks.push({
+        page: multiPage ? i + 1 : undefined,
+        run: async (signal) => {
+          let input: PreparedImage = {
+            buffer,
+            mimeType,
+            width: dimensions.width,
+            height: dimensions.height,
+          };
+          if (isTiff) {
+            // tesseract.js and several VLM APIs cannot read TIFF: hand over PNG frames.
+            input = await renderTiffPage(buffer, i, autoRotate);
+          } else if (autoRotate && dimensions.type !== 'gif' && dimensions.type !== 'bmp') {
+            const rotated = await autoRotateImage(buffer, mimeType);
+            if (rotated) input = rotated;
+          }
+          const result = await ocrImageDetailed(
+            input.buffer,
+            ocrOpts,
+            {
+              mimeType: input.mimeType,
+              sourceExtension: ext,
+              fileName,
+              imageWidth: input.width,
+              imageHeight: input.height,
+              kind,
+              index: i,
+              ...(multiPage ? { page: i + 1, pageCount } : {}),
+              ...(signal ? { signal } : {}),
+            },
+            conv
+          );
+          return result.markdown ?? result.text;
+        },
+      });
+    }
+    outcomes = await runOcrTasks(tasks, {
+      concurrency: ocrOpts.concurrency,
+      timeoutMs: ocrOpts.timeoutMs,
+      signal: conv.signal,
+      onProgress: ocrOpts.onProgress,
+      kind,
+    });
+  } catch (ocrErr: any) {
+    // Runner-level failure (cancellation or a missing OCR module): same handling as a failed image.
+    if (conv.signal && conv.signal.aborted) throw new PassThroughError(ocrErr);
+    return failImage(ocrErr, label, report, conv, onError);
+  }
+
+  const parts: string[] = [];
+  let hasText = false;
+  let textChars = 0;
+  let firstError: Error | undefined;
+  outcomes.forEach((outcome, i) => {
+    const page = i + 1;
+    if (outcome.status === 'ok') {
+      if (outcome.value) {
+        hasText = true;
+        parts.push(outcome.value);
+        textChars += countChars(outcome.value);
+      }
+      if (multiPage) {
+        conv.pages.push({
+          page,
+          source: outcome.value ? 'ocr' : 'empty',
+          chars: countChars(outcome.value),
+          ms: outcome.ms,
+        });
+      }
+      return;
+    }
+    if (outcome.status !== 'error') return;
+    firstError ??= outcome.error;
+    if (multiPage) {
+      conv.pages.push({ page, source: 'error', chars: 0, error: outcome.error.message, ms: outcome.ms });
+      if (outcome.timedOut) conv.warn('ocr_timeout', `${label} page ${page}`);
+      else conv.warn('ocr_page_failed', `${label} page ${page}: ${outcome.error.message}`);
+      if (onError === 'comment') {
+        parts.push(`<!-- OCR failed (page ${page}): ${outcome.error.message} -->`);
+      }
+    }
+  });
+  if (multiPage) conv.stats.pageCount = pageCount;
+
+  if (firstError && onError === 'throw') throw new PassThroughError(firstError);
+
+  let out = '';
+  if (hasText) {
+    report.ocr = true;
+    report.chars = textChars;
+    out += `\n\n## Extracted Text\n\n${parts.join('\n\n')}\n`;
+  } else if (firstError) {
+    report.error = firstError.message;
+    if (!multiPage) {
+      if (firstError instanceof OcrTimeoutError) conv.warn('ocr_timeout', label);
+      else conv.warn('ocr_image_failed', `${label}: ${firstError.message}`);
+    }
+    if (onError === 'comment') out += `\n\n<!-- OCR failed: ${firstError.message} -->\n`;
+  }
+  return out;
+}
+
+function failImage(
+  err: any,
+  label: string,
+  report: ImageReport,
+  conv: ConversionContext,
+  onError: 'comment' | 'skip' | 'throw'
+): string {
+  report.error = err.message;
+  if (err instanceof OcrTimeoutError) conv.warn('ocr_timeout', label);
+  else conv.warn('ocr_image_failed', `${label}: ${err.message}`);
+  if (onError === 'throw') throw new PassThroughError(err);
+  if (onError === 'comment') return `\n\n<!-- OCR failed: ${err.message} -->\n`;
+  return '';
 }
 
 /**
