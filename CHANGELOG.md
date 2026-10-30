@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-10-30
+
+### Fixed
+
+- PPTX picture alt text: a backslash in a picture description is now escaped
+  along with the brackets. Before, a backslash in front of a bracket, or at the
+  end of the description, ended the alt text early. Pictures are listed with
+  `images: 'placeholder'` and with `ocr.embeddedImages`.
+- DOCX, HTML and EPUB picture alt text: `turndown` is now required at 7.2.3 or
+  later, the first version that escapes it. An installed 7.2.0 to 7.2.2 wrote
+  it unescaped.
+
 ## [3.6.0] - 2026-10-28
 
 ### Added
