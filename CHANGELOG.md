@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-10-28
+
+### Added
+
+- Per-page PDF OCR: `ocr.pdfMode: 'auto-page'` OCRs only the pages whose text
+  layer is missing, garbled or too short (a scan with a stamp), keeps the
+  native text of the other pages and preserves page order. Tune it with
+  `pageTrigger` (`minChars`, `maxGarbledRatio`, `requireImage`).
+- `convertToMarkdownDetailed(input, options?)`: the same Markdown plus a report
+  (per-page source and reason, per-image results, warnings, OCR/render timings).
+- OCR handler results can be objects (`{ text, markdown?, confidence? }`);
+  handler context gained `kind`, `index`, `sourcePath`, `slide`, `langHint` and
+  `signal`. `ocr.documentHandler` OCRs a whole PDF in one call.
+- OCR pipeline controls: `render` (scale, `maxPixels`, jpeg, grayscale),
+  `maxPages`, `concurrency`, `timeoutMs`, `signal` (abort), `onProgress` and
+  `onError` (`comment` / `skip` / `throw`).
+- Tesseract: one reusable worker per conversion (up to 4 with `concurrency`),
+  `tesseract.langPath`, `cachePath`, `offline` (never downloads or writes
+  language data), `psm`, `oem`, `gzip`; ISO 639-1 language codes (`'tr+en'`)
+  and the exported `toTesseractLang()` helper.
+- VLM providers: real media type, conversion of unsupported formats to PNG,
+  retries with backoff (`vlm.retries`, `Retry-After`) and `vlm.timeoutMs`.
+- Embedded images in DOCX, PPTX, HTML and EPUB: `images: 'placeholder' | 'omit'`
+  and OCR of embedded images with `ocr.embeddedImages` (size filter, dedupe,
+  `maxImages`). EPUB images are not OCRed yet.
+- Multi-page TIFF support (`Pages: N` header, per-frame OCR), EXIF
+  auto-rotation before image OCR (`ocr.autoRotate`), `imageMetadata: false`
+  and `imageTextHeading: false` (with both, an image converts to its
+  recognised text alone).
+- `FileExtension.TIF`, `TIFF`, `WEBP` and `BMP`.
+- `benchmark/ocr/run.ts` and an opt-in real Tesseract test
+  (`TM_TEST_TESSERACT=1`, `TM_TESSDATA_DIR`); neither is part of `npm test`.
+
+### Fixed
+
+- `.tif`, `.tiff`, `.webp` and `.bmp` files were decoded as UTF-8 text and
+  produced garbage; they are now handled as images.
+- PPTX conversion wrote a temporary file into the working directory; the
+  archive is now read from memory.
+
+### Notes
+
+- No breaking changes. With the options 3.5.0 knew (including `ocr: true`
+  and the legacy `pdfMode` values) the document structure and text are
+  identical to 3.5.0 for the inputs covered by the golden-output test, which
+  uses a fixed fake OCR handler.
+- Public types only gained optional members and new types. `OCRHandler`,
+  `OCROptions.lang` (still a `string`) and every existing result type are
+  unchanged; two input options accept more values: `pdfMode` adds
+  `'auto-page'`, and `handler` also takes an `OCRRichHandler` (a handler that
+  may resolve to `{ text, markdown?, confidence? }`). Language lists go in the
+  new `OCROptions.languages`.
+
+### Behaviour notes
+
+Calls that already worked in 3.5.0 differ in these runtime details:
+
+- VLM requests (`openai-vlm`, `anthropic-vlm`, `ollama-vlm`, `custom-vlm`)
+  send the real media type of the image instead of always `image/png`; types
+  the APIs do not accept are converted to PNG.
+- VLM calls retry on HTTP 429, 5xx and network errors (default `retries: 2`,
+  backoff 1 s and 2 s), so a persistent failure takes about 3 s longer to
+  surface. Opt out with `vlm.retries: 0`.
+- Image OCR applies the EXIF orientation by default (`autoRotate: true`):
+  handlers and Tesseract receive the re-encoded, rotated image for JPEGs with
+  an orientation tag. Opt out with `ocr.autoRotate: false`.
+- ISO `lang` values such as `'tr'` are mapped to Tesseract codes (`'tur'`);
+  other values pass through unchanged.
+- OCR handler contexts always carry `kind` and `index`, plus `signal` when a
+  signal is active.
+- With the Tesseract provider, `concurrency` is capped at 4 (the worker count).
+
 ## [3.5.0] - 2026-10-21
 
 ### Fixed

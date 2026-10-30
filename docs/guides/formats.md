@@ -206,9 +206,9 @@ Article content here...
 
 ## Media Formats
 
-### Images (.jpg, .jpeg, .png, .gif)
+### Images (.jpg, .jpeg, .png, .gif, .tif, .tiff, .webp, .bmp)
 
-Extracts metadata from image files.
+Extracts metadata from image files (multi-page TIFFs report `Pages: N`).
 
 ```typescript
 const markdown = await convertToMarkdown('./photo.jpg');
@@ -219,7 +219,7 @@ const markdown = await convertToMarkdown('./photo.jpg');
 - Format information
 - File size
 
-**Note:** OCR support planned for future releases.
+**OCR:** pass `ocr` options to extract text from images (every frame of a multi-page TIFF); see the OCR section of the README and the [options reference](../api/options.md).
 
 ---
 

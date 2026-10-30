@@ -1,9 +1,10 @@
-import type { ConverterInput, ConverterOptions } from './types/index.js';
+import type { ConverterInput, ConverterOptions, DetailedConversion } from './types/index.js';
+import { createConversionContext, type ConversionContext } from './utils/conversionContext.js';
 import { detectFileType } from './utils/fileDetection.js';
 import { convertPdfToMarkdown } from './converters/pdf.js';
 import { convertDocToMarkdown } from './converters/doc.js';
 import { convertDocxToMarkdown } from './converters/docx.js';
-import { convertHtmlToMarkdown } from './converters/html.js';
+import { convertHtmlToMarkdownAsync } from './converters/html.js';
 import {
   convertTextFileToMarkdown,
   convertYoutubeToMarkdown,
@@ -65,21 +66,56 @@ export async function convertToMarkdown(
   input: ConverterInput,
   options: ConverterOptions = {}
 ): Promise<string> {
-  const { buffer, extension: ext } = await detectFileType(input, options);
+  return (await convertToMarkdownDetailed(input, options)).markdown;
+}
 
+/**
+ * Like {@link convertToMarkdown}, but also returns what happened on the way:
+ * per-page and per-image reports, warnings (`"code: detail"`) and OCR statistics.
+ * `markdown` is byte-identical to what `convertToMarkdown` returns (both run the
+ * same code path).
+ *
+ * @example
+ * ```typescript
+ * const { markdown, pages, warnings, stats } = await convertToMarkdownDetailed(
+ *   'scan.pdf',
+ *   { ocr: { provider: 'handler', handler } }
+ * );
+ * ```
+ */
+export async function convertToMarkdownDetailed(
+  input: ConverterInput,
+  options: ConverterOptions = {}
+): Promise<DetailedConversion> {
+  const ctx = createConversionContext(options);
+  try {
+    const { buffer, extension } = await detectFileType(input, options);
+    const markdown = await convertBuffer(buffer, extension, options, ctx);
+    return ctx.finish(markdown, extension);
+  } finally {
+    await ctx.dispose();
+  }
+}
+
+async function convertBuffer(
+  buffer: Buffer,
+  ext: string,
+  options: ConverterOptions,
+  ctx: ConversionContext
+): Promise<string> {
   switch (ext) {
     case '.pdf':
-      return await convertPdfToMarkdown(buffer, options.ocr, options.fileName);
+      return await convertPdfToMarkdown(buffer, options.ocr, options.fileName, ctx);
 
     case '.doc':
       return await convertDocToMarkdown(buffer, options.doc);
 
     case '.docx':
-      return await convertDocxToMarkdown(buffer);
+      return await convertDocxToMarkdown(buffer, options, ctx);
 
     case '.html':
     case '.htm':
-      return convertHtmlToMarkdown(buffer);
+      return await convertHtmlToMarkdownAsync(buffer, options, ctx);
 
     case '.txt':
       return convertTextFileToMarkdown(buffer);
@@ -104,16 +140,20 @@ export async function convertToMarkdown(
       return await convertAudioToMarkdown(buffer, ext);
 
     case '.pptx':
-      return await convertPptxToMarkdown(buffer);
+      return await convertPptxToMarkdown(buffer, options, ctx);
 
     case '.zip':
-      return await convertZipToMarkdown(buffer, options);
+      return await convertZipToMarkdown(buffer, options, ctx);
 
     case '.jpg':
     case '.jpeg':
     case '.png':
     case '.gif':
-      return await convertImageToMarkdown(buffer, ext, options.ocr, options.fileName);
+    case '.tif':
+    case '.tiff':
+    case '.webp':
+    case '.bmp':
+      return await convertImageToMarkdown(buffer, ext, options.ocr, options.fileName, ctx);
 
     case '.json':
       return convertJsonToMarkdown(buffer);
@@ -123,7 +163,7 @@ export async function convertToMarkdown(
       return convertYamlToMarkdown(buffer);
 
     case '.epub':
-      return await convertEpubToMarkdown(buffer);
+      return await convertEpubToMarkdown(buffer, options, ctx);
 
     case '.msg':
       return convertMsgToMarkdown(buffer);

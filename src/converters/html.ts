@@ -1,8 +1,17 @@
-import { load } from 'cheerio';
+import { load, type CheerioAPI } from 'cheerio';
 import { existsSync, readFileSync } from 'fs';
 import TurndownService from 'turndown';
 import { formatMarkdown } from '../utils/markdown.js';
-import type { TurndownOptions } from '../types/index.js';
+import type { ConverterOptions, TurndownOptions } from '../types/index.js';
+import { withConversionContext, type ConversionContext } from '../utils/conversionContext.js';
+import {
+  EmbeddedImageSession,
+  hoistTokenImagesOutOfTables,
+  IMAGE_TOKEN_SCHEME,
+  replaceImageTokens,
+  resolveEmbeddedImagePolicy,
+  type EmbeddedImagePolicy,
+} from '../utils/embeddedImages.js';
 
 /**
  * Converts HTML buffer or string to Markdown
@@ -11,17 +20,7 @@ import type { TurndownOptions } from '../types/index.js';
  */
 export function convertHtmlToMarkdown(input: Buffer | string): string {
   try {
-    let htmlContent: string;
-
-    if (Buffer.isBuffer(input)) {
-      htmlContent = input.toString('utf-8');
-    } else if (typeof input === 'string' && existsSync(input)) {
-      htmlContent = readFileSync(input, 'utf-8');
-    } else if (typeof input === 'string') {
-      htmlContent = input;
-    } else {
-      throw new Error('Invalid HTML content');
-    }
+    const htmlContent = readHtmlInput(input);
 
     let markdown = htmlToMarkdown(htmlContent);
     markdown = formatMarkdown(markdown);
@@ -32,6 +31,19 @@ export function convertHtmlToMarkdown(input: Buffer | string): string {
   }
 }
 
+function readHtmlInput(input: Buffer | string): string {
+  if (Buffer.isBuffer(input)) {
+    return input.toString('utf-8');
+  }
+  if (typeof input === 'string' && existsSync(input)) {
+    return readFileSync(input, 'utf-8');
+  }
+  if (typeof input === 'string') {
+    return input;
+  }
+  throw new Error('Invalid HTML content');
+}
+
 // Elements that legitimately have no text content and must survive the
 // empty-element cleanup below (or whose removal would corrupt structure,
 // e.g. dropping an empty <td> shifts every following table column).
@@ -39,17 +51,8 @@ const EMPTY_KEEP_SELECTOR =
   'img, br, hr, input, iframe, svg, video, audio, source, track, embed, ' +
   'object, canvas, picture, td, th, tr, table, thead, tbody, tfoot, colgroup, col';
 
-/**
- * Converts HTML string to Markdown using Turndown
- * @param htmlString - HTML content string
- * @returns Markdown string
- */
-export function htmlToMarkdown(htmlString: string): string {
-  // NOTE: parse in standard HTML mode. The previous `xml.normalizeWhitespace`
-  // parse collapsed the newlines inside <pre> blocks (destroying code
-  // formatting) and mis-parsed void elements like <img>.
-  const $ = load(htmlString);
-
+/** Elements that never carry document content (shared by the Markdown and image passes). */
+function stripNonContent($: CheerioAPI): void {
   // Remove non-content elements. <head> in particular: its <title> text used
   // to leak into the markdown body as a stray first line.
   $('head, script, style, noscript, template').remove();
@@ -62,6 +65,20 @@ export function htmlToMarkdown(htmlString: string): string {
     '.mw-portlet, .vector-toc, .navbox, .noprint, ' +
     '[role="banner"], [role="contentinfo"], ' +
     'body > header, body > footer').remove();
+}
+
+/**
+ * Converts HTML string to Markdown using Turndown
+ * @param htmlString - HTML content string
+ * @returns Markdown string
+ */
+export function htmlToMarkdown(htmlString: string): string {
+  // NOTE: parse in standard HTML mode. The previous `xml.normalizeWhitespace`
+  // parse collapsed the newlines inside <pre> blocks (destroying code
+  // formatting) and mis-parsed void elements like <img>.
+  const $ = load(htmlString);
+
+  stripNonContent($);
 
   // Remove empty elements (layout divs/spans with no content), but keep
   // void/media/table elements and anything that contains one — removing a
@@ -141,4 +158,99 @@ export function htmlToMarkdown(htmlString: string): string {
     .replace(/[^\S\n]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/**
+ * Converts HTML to Markdown honouring the embedded image options
+ * (`images: 'placeholder' | 'omit'`, `ocr.embeddedImages`). Without them this is
+ * exactly {@link convertHtmlToMarkdown}.
+ *
+ * Embedded images are `data:` URIs; remote or relative image URLs are never fetched.
+ *
+ * @param input   - HTML content as buffer, string, or file path
+ * @param options - Converter options (internal use: `images`, `ocr`)
+ * @param ctx     - Conversion context (reports, warnings, shared OCR engine); internal
+ */
+export async function convertHtmlToMarkdownAsync(
+  input: Buffer | string,
+  options?: ConverterOptions,
+  ctx?: ConversionContext
+): Promise<string> {
+  const policy = resolveEmbeddedImagePolicy(options);
+  if (!policy) return convertHtmlToMarkdown(input);
+  return withConversionContext(ctx, options ?? {}, (conv) =>
+    convertHtmlWithSession(input, new EmbeddedImageSession(conv, policy))
+  );
+}
+
+/** Parses a `data:image/...` URI into bytes; `undefined` for anything else. */
+function decodeImageDataUri(
+  src: string,
+  needBytes = true
+): { buffer: Buffer; mimeType: string } | undefined {
+  const match = /^data:([^;,]*)((?:;[^,]*)?),([\s\S]*)$/i.exec(src.trim());
+  if (!match) return undefined;
+  const mimeType = match[1].trim().toLowerCase();
+  if (!mimeType.startsWith('image/')) return undefined;
+  // Without OCR only the type matters: do not decode (and hold) the bytes.
+  if (!needBytes) return { buffer: Buffer.alloc(0), mimeType };
+  try {
+    const buffer = /;base64/i.test(match[2])
+      ? Buffer.from(match[3].replace(/\s+/g, ''), 'base64')
+      : Buffer.from(decodeURIComponent(match[3]), 'utf-8');
+    return buffer.length > 0 ? { buffer, mimeType } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * HTML conversion with image handling driven by a shared {@link EmbeddedImageSession}
+ * (EPUB chapters share one session so image numbers continue across chapters).
+ */
+export async function convertHtmlWithSession(
+  input: Buffer | string,
+  session: EmbeddedImageSession
+): Promise<string> {
+  const policy: EmbeddedImagePolicy = session.policy;
+  const sources = new Map<number, string>();
+  let prepared: string;
+  try {
+    const $ = load(readHtmlInput(input));
+    stripNonContent($);
+    $('img')
+      .toArray()
+      .forEach((el) => {
+        const node = $(el);
+        const src = node.attr('src') ?? '';
+        const decoded = decodeImageDataUri(src, !!policy.ocr);
+        if (decoded) {
+          const entry = session.register({ buffer: decoded.buffer, mimeType: decoded.mimeType });
+          sources.set(entry.index, src);
+          node.attr('src', `${IMAGE_TOKEN_SCHEME}${entry.index}`);
+        } else if (policy.mode === 'omit') {
+          node.remove();
+        }
+      });
+    hoistTokenImagesOutOfTables($);
+    prepared = $.html();
+  } catch (err: any) {
+    throw new Error(`Failed to convert HTML: ${err.message}`);
+  }
+
+  // Cancellation and `onError: 'throw'` surface unchanged.
+  await session.runOcr();
+
+  try {
+    const markdown = replaceImageTokens(htmlToMarkdown(prepared), (id, alt, title) => {
+      const entry = session.entries[id];
+      const block = entry?.block || undefined;
+      if (!entry || policy.mode === 'omit') return { image: '', block };
+      const target = policy.mode === 'placeholder' ? entry.placeholder : (sources.get(id) ?? '');
+      return { image: `![${alt}](${target}${title})`, block };
+    });
+    return formatMarkdown(markdown);
+  } catch (err: any) {
+    throw new Error(`Failed to convert HTML: ${err.message}`);
+  }
 }

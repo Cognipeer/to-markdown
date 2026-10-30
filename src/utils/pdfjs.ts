@@ -9,7 +9,7 @@
 import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { definePDFJSModule, getDocumentProxy } from 'unpdf';
+import { definePDFJSModule, getDocumentProxy, getResolvedPDFJS } from 'unpdf';
 
 const require = createRequire(import.meta.url);
 const pdfjsDir = dirname(require.resolve('pdfjs-dist/package.json'));
@@ -44,3 +44,13 @@ export async function loadPdf(buffer: Uint8Array): ReturnType<typeof getDocument
  */
 export const canvasImport = () =>
   import(pathToFileURL(require.resolve('@napi-rs/canvas', { paths: [pdfjsDir] })).href);
+
+/**
+ * The operator codes (`OPS`) of the pdf.js module `loadPdf` uses, to inspect a
+ * page's operator list (e.g. to find raster images).
+ */
+export async function getPdfOps(): Promise<Record<string, number>> {
+  configured ??= definePDFJSModule(() => import('pdfjs-dist/legacy/build/pdf.mjs'));
+  await configured;
+  return (await getResolvedPDFJS()).OPS as unknown as Record<string, number>;
+}

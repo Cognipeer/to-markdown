@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { isAbsolute, join } from 'path';
-import { convertToMarkdown } from './convert.js';
+import { convertToMarkdown, convertToMarkdownDetailed } from './convert.js';
 import type { BatchInput, BatchResult } from './types/index.js';
 
 // ── Re-exports ─────────────────────────────────────────────────────────────
-export { convertToMarkdown } from './convert.js';
+export { convertToMarkdown, convertToMarkdownDetailed } from './convert.js';
 export { convertUrlToMarkdown } from './converters/url.js';
 export { DocConversionError } from './converters/doc/errors.js';
 export type { DocErrorCode } from './converters/doc/errors.js';
@@ -23,6 +23,7 @@ export { extractSections, buildFrontmatter, emitFrontmatter } from './utils/meta
 export type { Section, Frontmatter } from './utils/metadata.js';
 
 export { ocrImage } from './utils/ocr.js';
+export { toTesseractLang } from './utils/lang.js';
 export { extractPdfPages } from './converters/pdf.js';
 export type { OCRProvider, VLMOptions } from './types/index.js';
 
@@ -125,6 +126,7 @@ export * from './types/index.js';
 // Default export for backward compatibility
 export default {
   convertToMarkdown,
+  convertToMarkdownDetailed,
   convertBatchToMarkdown,
   saveToMarkdownFile,
 };

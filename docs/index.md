@@ -39,7 +39,7 @@ A versatile utility library for converting various file formats to Markdown.
 | Jupyter | `.ipynb` | Jupyter notebooks |
 | PowerPoint | `.pptx` | PowerPoint presentations |
 | XML/RSS | `.xml`, `.rss`, `.atom` | XML and feed formats |
-| Images | `.jpg`, `.png`, `.gif` | Image files (metadata extraction) |
+| Images | `.jpg`, `.png`, `.gif`, `.tif`, `.tiff`, `.webp`, `.bmp` | Image files (metadata extraction) |
 | Audio | `.mp3`, `.wav` | Audio files (metadata extraction) |
 | Text | `.txt` | Plain text files |
 | Archives | `.zip` | ZIP archives |
