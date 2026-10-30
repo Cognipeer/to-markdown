@@ -320,6 +320,15 @@ describe("PPTX embedded images", () => {
     );
   });
 
+  it("escapes backslashes and brackets in the alt text, so a description cannot close it early", async () => {
+    const zip = new AdmZip(PPTX);
+    const slide = zip.getEntry("ppt/slides/slide1.xml")!;
+    const xml = slide.getData().toString("utf8").replace('descr="Roadmap chart screenshot"', 'descr="a\\](x) [b]"');
+    zip.updateFile(slide, Buffer.from(xml, "utf8"));
+    const md = await convert(zip.toBuffer(), "slides.pptx", { images: "placeholder" });
+    expect(md).toContain("![a\\\\\\](x) \\[b\\]](image1.png)");
+  });
+
   it("omit without OCR is identical to the default output", async () => {
     expect(await convert(PPTX, "slides.pptx", { images: "omit" })).toBe(await convert(PPTX, "slides.pptx"));
   });
