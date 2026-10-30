@@ -114,7 +114,8 @@ async function convertPptxWithImages(
         const entry = session.entries[picture.entryIndex];
         // Blank lines keep pictures and OCR text out of the slide's text paragraph.
         if (policy.mode !== 'omit') {
-          const alt = picture.alt.replace(/\s+/g, ' ').trim().replace(/([\[\]])/g, '\\$1');
+          // A backslash is escaped too: left alone before a bracket, it would cancel that bracket's escape.
+          const alt = picture.alt.replace(/\s+/g, ' ').trim().replace(/[\\[\]]/g, '\\$&');
           md += `\n![${alt}](${posix.basename(picture.mediaPath)})\n`;
         }
         if (entry.block) md += `\n${entry.block}\n`;
