@@ -108,6 +108,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 Full history: [CHANGELOG.md](./CHANGELOG.md).
 
+### Version 3.6.1
+
+- Fixed PPTX picture alt text ending early when a description has a backslash before a bracket or at its end.
+- Raised the `turndown` floor to 7.2.3, so the alt text of DOCX, HTML and EPUB pictures is always escaped.
+
 ### Version 3.6.0
 
 - Added per-page PDF OCR (`pdfMode: 'auto-page'`), `documentHandler`, render options, `concurrency`,
