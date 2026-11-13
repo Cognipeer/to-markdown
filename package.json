@@ -78,7 +78,7 @@
     "msgreader": "^1.0.1",
     "music-metadata": "^11.0.5",
     "papaparse": "^5.5.2",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.2.108",
     "sharp": "^0.35.4",
     "tesseract.js": "^5.0.0",
     "turndown": "^7.2.3",
